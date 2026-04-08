@@ -1,6 +1,9 @@
 """
 PyBullet simulation for the Robotic Horse quadruped.
 
+Run this from the repository root:
+    python pybullet/run_pybullet.py
+
 Loads the URDF, runs a trot gait, applies joint position targets,
 and logs joint torques every step.
 """

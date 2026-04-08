@@ -1,0 +1,53 @@
+# ros2_control.yaml
+# ──────────────────
+# Configuration for the controller_manager and the joint controllers.
+# This file is loaded by the gazebo_ros2_control plugin at simulation start.
+#
+# Controller overview:
+#   joint_state_broadcaster  — reads all joint positions/velocities from
+#                              Gazebo and republishes on /joint_states
+#   leg_controller           — JointTrajectoryController for all 8 actuated
+#                              joints; receives goals on
+#                              /leg_controller/joint_trajectory
+
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz — how often the controller loop runs
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    leg_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+# ── Leg trajectory controller ──────────────────────────────────────
+leg_controller:
+  ros__parameters:
+    joints:
+      - fl_thigh_joint
+      - fl_knee_joint
+      - fr_thigh_joint
+      - fr_knee_joint
+      - rl_thigh_joint
+      - rl_knee_joint
+      - rr_thigh_joint
+      - rr_knee_joint
+
+    command_interfaces:
+      - position
+
+    state_interfaces:
+      - position
+      - velocity
+
+    # PID gains for each joint (position → effort)
+    # Tune these once the simulation is running; start conservative.
+    gains:
+      fl_thigh_joint: { p: 200.0, i: 0.0, d: 10.0 }
+      fl_knee_joint:  { p: 400.0, i: 0.0, d: 20.0 }
+      fr_thigh_joint: { p: 200.0, i: 0.0, d: 10.0 }
+      fr_knee_joint:  { p: 400.0, i: 0.0, d: 20.0 }
+      rl_thigh_joint: { p: 200.0, i: 0.0, d: 10.0 }
+      rl_knee_joint:  { p: 400.0, i: 0.0, d: 20.0 }
+      rr_thigh_joint: { p: 200.0, i: 0.0, d: 10.0 }
+      rr_knee_joint:  { p: 400.0, i: 0.0, d: 20.0 }
