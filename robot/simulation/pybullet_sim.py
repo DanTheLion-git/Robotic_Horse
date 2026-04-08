@@ -1,0 +1,164 @@
+"""
+PyBullet simulation for the Robotic Horse quadruped.
+
+Loads the URDF, runs a trot gait, applies joint position targets,
+and logs joint torques every step.
+"""
+
+import os
+import time
+import numpy as np
+import pybullet as pb
+import pybullet_data
+
+from robot.gait.walk_gait import generate_gait_trajectory, LEG_NAMES
+from robot.kinematics.force_calculator import (
+    analyse_gait_forces,
+    M_BODY,
+)
+
+URDF_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "urdf", "robotic_horse.urdf"
+)
+
+# Joint names in the URDF that we actively control
+JOINT_MAP = {
+    "fl": {"hip": "fl_thigh_joint", "knee": "fl_knee_joint"},
+    "fr": {"hip": "fr_thigh_joint", "knee": "fr_knee_joint"},
+    "rl": {"hip": "rl_thigh_joint", "knee": "rl_knee_joint"},
+    "rr": {"hip": "rr_thigh_joint", "knee": "rr_knee_joint"},
+}
+
+SIM_DT      = 1 / 240.0    # PyBullet default timestep
+GAIT_PERIOD = 1.0           # seconds per gait cycle
+N_CYCLES    = 3             # how many gait cycles to simulate
+
+
+def build_joint_index(robot_id: int) -> dict[str, int]:
+    """Return a mapping {joint_name: joint_index} for all joints."""
+    index = {}
+    n = pb.getNumJoints(robot_id)
+    for i in range(n):
+        info = pb.getJointInfo(robot_id, i)
+        index[info[1].decode()] = i
+    return index
+
+
+def run_simulation(gui: bool = True, record_forces: bool = True) -> dict:
+    """
+    Run the trot gait simulation.
+
+    Parameters
+    ----------
+    gui            : If True, open the PyBullet GUI window.
+    record_forces  : If True, record joint reaction forces each step.
+
+    Returns
+    -------
+    dict with force / torque logs per leg.
+    """
+    mode = pb.GUI if gui else pb.DIRECT
+    physics_client = pb.connect(mode)
+    pb.setAdditionalSearchPath(pybullet_data.getDataPath())
+    pb.setGravity(0, 0, -9.81)
+    pb.setTimeStep(SIM_DT)
+
+    # Load ground plane
+    plane_id = pb.loadURDF("plane.urdf")
+
+    # Load robot — spawn above ground so feet clear the floor
+    start_pos = [0, 0, 1.10]
+    start_orn = pb.getQuaternionFromEuler([0, 0, 0])
+    robot_id  = pb.loadURDF(
+        os.path.normpath(URDF_PATH),
+        start_pos,
+        start_orn,
+        useFixedBase=False,
+    )
+
+    joint_index = build_joint_index(robot_id)
+
+    # Pre-generate trajectory
+    gait = generate_gait_trajectory(n_steps=200)
+    steps_per_cycle = int(GAIT_PERIOD / SIM_DT)
+    total_steps     = steps_per_cycle * N_CYCLES
+
+    # Storage
+    logs: dict[str, list] = {leg: [] for leg in LEG_NAMES}
+
+    for step in range(total_steps):
+        gait_phase = (step % steps_per_cycle) / steps_per_cycle
+        traj_idx   = int(gait_phase * 200)
+
+        for leg in LEG_NAMES:
+            th_hip  = gait[leg]["theta_hip"][traj_idx]
+            th_knee = gait[leg]["theta_knee"][traj_idx]
+
+            hip_jnt  = JOINT_MAP[leg]["hip"]
+            knee_jnt = JOINT_MAP[leg]["knee"]
+
+            if hip_jnt in joint_index:
+                pb.setJointMotorControl2(
+                    robot_id,
+                    joint_index[hip_jnt],
+                    pb.POSITION_CONTROL,
+                    targetPosition=th_hip,
+                    force=500,
+                    positionGain=0.5,
+                    velocityGain=0.1,
+                )
+            if knee_jnt in joint_index:
+                pb.setJointMotorControl2(
+                    robot_id,
+                    joint_index[knee_jnt],
+                    pb.POSITION_CONTROL,
+                    targetPosition=th_knee,
+                    force=800,
+                    positionGain=0.5,
+                    velocityGain=0.1,
+                )
+
+        pb.stepSimulation()
+
+        if record_forces:
+            for leg in LEG_NAMES:
+                knee_jnt = JOINT_MAP[leg]["knee"]
+                if knee_jnt in joint_index:
+                    state = pb.getJointState(robot_id, joint_index[knee_jnt])
+                    # state[3] is the applied joint motor torque
+                    logs[leg].append(
+                        {
+                            "step":       step,
+                            "phase":      gait_phase,
+                            "knee_angle": state[0],
+                            "knee_torque": state[3],
+                        }
+                    )
+
+        if gui:
+            time.sleep(SIM_DT)
+
+    pb.disconnect()
+
+    # Convert lists to numpy arrays
+    results = {}
+    for leg in LEG_NAMES:
+        entries = logs[leg]
+        results[leg] = {
+            "phase":       np.array([e["phase"]       for e in entries]),
+            "knee_angle":  np.array([e["knee_angle"]  for e in entries]),
+            "knee_torque": np.array([e["knee_torque"] for e in entries]),
+        }
+
+    return results
+
+
+def print_force_summary(sim_results: dict) -> None:
+    """Print a summary of peak and mean knee torques from simulation."""
+    print("\n" + "=" * 55)
+    print("  SIMULATION FORCE SUMMARY — knee joint torques [N·m]")
+    print("=" * 55)
+    for leg, data in sim_results.items():
+        t = np.abs(data["knee_torque"])
+        print(f"  {leg.upper()}  peak={t.max():.1f}  mean={t.mean():.1f}  rms={np.sqrt(np.mean(t**2)):.1f}")
+    print("=" * 55)
