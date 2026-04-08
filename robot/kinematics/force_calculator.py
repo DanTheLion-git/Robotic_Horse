@@ -1,60 +1,61 @@
 """
 Force calculator for the linear ballscrew knee actuator.
 
-The ballscrew converts a linear force F_screw [N] into a knee torque τ [N·m]
-through a slider-crank geometry.  We also compute the required motor torque
-from the ballscrew lead (mm/rev).
+Physical design summary
+───────────────────────
+  • Brushless motor at the top of the upper-leg tube spins a ballscrew shaft.
+  • The ballscrew nut travels up/down the shaft.
+  • A pin through a slot in the tube wall connects the nut to the lower leg
+    (shank) at distance R_ARM from the knee pivot.
+  • Moving the nut up bends the knee (swings shank forward/up);
+    moving it down extends the knee (swings shank back/down).
 
-Key relationships
-─────────────────
-1. Torque ↔ force via virtual work principle:
-       τ = F_screw · (ds/dθ)
-   where s(θ) is the ballscrew length as a function of knee angle.
-   Therefore:
-       F_screw = τ / (ds/dθ)
+Key force relationships
+───────────────────────
+1.  Nut force ↔ knee torque  (virtual work, exact):
+        F_nut = τ_knee / (R_ARM · |sin θ_knee|)
+    Lever arm = R_ARM · |sin θ_knee|  (0 at straight, max at 90° bend)
 
-2. Required knee torque from static equilibrium of the shank under
-   gravity and a vertical ground reaction force (GRF):
-       τ_knee = m_shank · g · (L2/2) · sin(−(θ_hip + θ_knee))
-              + F_GRF · moment_arm(θ_hip, θ_knee)
+2.  Knee torque from static equilibrium:
+        τ_knee = weight of shank/foot + body-weight GRF × moment arm
 
-3. Motor torque from ballscrew lead:
-       τ_motor = F_screw · (lead / (2π)) / η
-   where lead [m/rev], η = mechanical efficiency (≈ 0.90 for ballscrew).
+3.  Motor shaft torque from nut force:
+        τ_motor = F_nut · (lead / 2π) / η
+    where  lead = screw lead [m/rev],  η = mechanical efficiency
 
-All angles follow the URDF convention (knee negative when bent).
+4.  Motor shaft speed from knee angular velocity:
+        ω_motor = v_nut · (2π / lead)
+        v_nut   = R_ARM · |sin θ_knee| · ω_knee
+
+5.  Carriage drag (set to 0 for now — negligible):
+        F_carriage = 0  N
+
+All angles follow the URDF convention: θ_knee < 0 when bent.
 """
 
 import numpy as np
 from robot.kinematics.leg_kinematics import (
-    L1, L2, BALLSCREW_A, BALLSCREW_B,
-    ballscrew_length, forward_kinematics,
+    L1, L2, R_ARM, NUT_STROKE,
+    nut_position, nut_lever_arm, nut_velocity,
+    forward_kinematics,
 )
 
 
-# ── Constants ──────────────────────────────────────────────────────
-G = 9.81            # m/s²
-M_BODY = 20.0       # body frame mass  [kg]  (legs carry ~body/4 each)
-M_THIGH = 1.5       # thigh link mass  [kg]
-M_SHANK = 1.0       # shank + foot mass [kg]
-M_FOOT = 0.2        # foot sphere mass  [kg]
-
-BALLSCREW_LEAD = 0.005   # 5 mm / rev → 0.005 m/rev
-BALLSCREW_EFF  = 0.90    # mechanical efficiency
-
+# ── Robot mass parameters ──────────────────────────────────────────
+G = 9.81            # gravitational acceleration  [m/s²]
+M_BODY   = 20.0     # body frame mass  [kg]
+M_THIGH  = 1.5      # upper-leg tube + motor mass per leg  [kg]
+M_SHANK  = 1.0      # lower-leg tube mass per leg  [kg]
+M_FOOT   = 0.2      # foot sphere mass per leg  [kg]
 NUM_LEGS = 4
 
+# ── Ballscrew / motor parameters ───────────────────────────────────
+BALLSCREW_LEAD = 0.005   # screw lead: 5 mm/rev = 0.005 m/rev
+BALLSCREW_EFF  = 0.90    # mechanical efficiency of the ballscrew
 
-def ds_dtheta(theta_knee: float) -> float:
-    """
-    Derivative of ballscrew length w.r.t. knee angle (used as lever arm).
-
-    ds/dθ = a·b·sin(π + θ_knee) / s(θ_knee)
-    """
-    a, b = BALLSCREW_A, BALLSCREW_B
-    phi = np.pi + theta_knee
-    s = ballscrew_length(theta_knee)
-    return (a * b * np.sin(phi)) / s
+# ── Carriage parameters ────────────────────────────────────────────
+# Resistance is negligible for now; increase once cart inertia is known.
+CARRIAGE_DRAG_N = 0.0    # horizontal drag force from carriage  [N]
 
 
 def knee_torque_static(
@@ -64,118 +65,171 @@ def knee_torque_static(
     include_grf: bool = True,
 ) -> float:
     """
-    Estimate knee joint torque required for static equilibrium.
+    Knee joint torque required for static equilibrium.
 
-    The knee must resist:
-      - Weight of the shank (mass at L2/2)
-      - Weight of the foot (mass at L2)
-      - A share of body weight acting vertically through the foot
-        (body_mass / NUM_LEGS, balanced via GRF)
+    Includes:
+      • Gravity torque of the shank (COM at L2/2 from pivot)
+      • Gravity torque of the foot  (at L2 from pivot)
+      • Ground reaction force (GRF) from body weight + upper-leg mass,
+        acting vertically at the foot — creates a moment at the knee
 
     Parameters
     ----------
-    theta_hip    : Hip flexion angle [rad]
-    theta_knee   : Knee angle [rad] (negative = bent)
-    body_mass    : Body frame mass [kg]
-    include_grf  : Whether to include the body-weight ground reaction
+    theta_hip   : Hip flexion angle [rad]
+    theta_knee  : Knee bend angle [rad] (negative = bent)
+    body_mass   : Total body frame mass [kg]
+    include_grf : Include body-weight GRF contribution
 
     Returns
     -------
-    τ [N·m]  — positive = knee extension torque required
+    τ [N·m]  — magnitude of extension torque the actuator must produce
     """
-    shank_angle = theta_hip + theta_knee  # absolute angle from vertical
+    shank_angle = theta_hip + theta_knee   # absolute angle of shank from vertical
 
-    # Gravity torque from shank mass (COM at L2/2 from knee)
-    tau_shank = (M_SHANK * G * (L2 / 2) * np.abs(np.sin(shank_angle)))
-
-    # Gravity torque from foot mass (at L2 from knee)
-    tau_foot = (M_FOOT * G * L2 * np.abs(np.sin(shank_angle)))
+    # Gravity torques about the knee pivot (horizontal moment arm of each mass)
+    tau_shank = M_SHANK * G * (L2 / 2) * abs(np.sin(shank_angle))
+    tau_foot  = M_FOOT  * G *  L2      * abs(np.sin(shank_angle))
 
     tau_grf = 0.0
     if include_grf:
-        # GRF = body share + leg masses (simplified: vertical force, horizontal moment arm)
         fk = forward_kinematics(theta_hip, theta_knee)
-        foot_x, foot_z = fk["foot_pos"]
-        knee_x, knee_z = fk["knee_pos"]
+        foot_x,  _  = fk["foot_pos"]
+        knee_x,  _  = fk["knee_pos"]
 
-        # Moment arm from knee to foot (horizontal component)
-        moment_arm = abs(foot_x - knee_x)
+        # Horizontal distance from knee pivot to foot = moment arm for GRF
+        moment_arm  = abs(foot_x - knee_x)
+
+        # Vertical load this leg carries: ¼ body + full leg mass stack
         vertical_load = (body_mass / NUM_LEGS + M_THIGH + M_SHANK + M_FOOT) * G
+
         tau_grf = vertical_load * moment_arm
 
     return tau_shank + tau_foot + tau_grf
 
 
-def ballscrew_force(theta_hip: float, theta_knee: float, **kwargs) -> float:
+def nut_force_required(
+    theta_hip: float,
+    theta_knee: float,
+    body_mass: float = M_BODY,
+) -> float:
     """
-    Linear force the ballscrew must exert at the given configuration.
+    Linear force the ballscrew nut must exert to hold/move the knee.
 
-    F = τ_knee / (ds/dθ)
+    F_nut = τ_knee / lever_arm = τ_knee / (R_ARM · |sin θ_knee|)
+
+    Returns float('inf') near the singular point (θ_knee ≈ 0).
 
     Returns
     -------
-    F [N]
+    F_nut [N]
     """
-    tau = knee_torque_static(theta_hip, theta_knee, **kwargs)
-    lever = ds_dtheta(theta_knee)
-    if abs(lever) < 1e-6:
-        return float("inf")   # singular configuration
-    return tau / abs(lever)
+    tau   = knee_torque_static(theta_hip, theta_knee, body_mass=body_mass)
+    lever = nut_lever_arm(theta_knee)
+    if lever < 1e-6:
+        return float("inf")
+    return tau / lever
 
 
-def motor_torque_from_force(force_n: float) -> float:
+def motor_torque_from_nut_force(force_n: float) -> float:
     """
-    Convert ballscrew linear force to required motor shaft torque.
+    Motor shaft torque required for a given nut force.
 
-    τ_motor = F · (lead / 2π) / η
+    τ_motor = F_nut · (lead / 2π) / η
 
     Returns
     -------
     τ_motor [N·m]
     """
-    return force_n * (BALLSCREW_LEAD / (2 * np.pi)) / BALLSCREW_EFF
+    return force_n * (BALLSCREW_LEAD / (2.0 * np.pi)) / BALLSCREW_EFF
+
+
+def motor_speed_rpm(theta_knee: float, omega_knee_rad_s: float) -> float:
+    """
+    Motor shaft speed (RPM) required to produce a given knee angular velocity.
+
+    ω_motor = v_nut / (lead / 2π)
+    v_nut   = R_ARM · |sin θ_knee| · ω_knee
+
+    Returns
+    -------
+    speed [RPM]
+    """
+    v = abs(nut_velocity(theta_knee, omega_knee_rad_s))
+    omega_motor_rad_s = v / (BALLSCREW_LEAD / (2.0 * np.pi))
+    return omega_motor_rad_s * 60.0 / (2.0 * np.pi)
+
+
+def motor_power(theta_knee: float, omega_knee_rad_s: float, force_n: float) -> float:
+    """
+    Instantaneous mechanical power the motor must deliver.
+
+    P = F_nut · v_nut
+
+    Returns
+    -------
+    P [W]
+    """
+    v = abs(nut_velocity(theta_knee, omega_knee_rad_s))
+    return force_n * v
 
 
 def analyse_gait_forces(
     theta_hip_seq: np.ndarray,
     theta_knee_seq: np.ndarray,
+    omega_knee_seq: np.ndarray | None = None,
     body_mass: float = M_BODY,
 ) -> dict:
     """
-    Compute ballscrew force and motor torque over a gait sequence.
+    Compute nut force, motor torque, speed, and power over a gait sequence.
 
     Parameters
     ----------
-    theta_hip_seq  : (N,) array of hip angles  [rad]
-    theta_knee_seq : (N,) array of knee angles [rad]
-    body_mass      : Body mass [kg]
+    theta_hip_seq   : (N,) hip angles  [rad]
+    theta_knee_seq  : (N,) knee angles [rad]
+    omega_knee_seq  : (N,) knee angular velocities [rad/s]  (optional)
+    body_mass       : Body frame mass [kg]
 
     Returns
     -------
-    dict with arrays: 'tau_knee', 'ballscrew_force', 'motor_torque',
-                      'ballscrew_length', 'foot_x', 'foot_z'
+    dict with arrays:
+      tau_knee, nut_force, motor_torque, motor_rpm, motor_power_w,
+      lever_arm, nut_position_m, foot_x, foot_z
     """
     n = len(theta_hip_seq)
-    tau_k  = np.zeros(n)
-    f_bs   = np.zeros(n)
-    tau_m  = np.zeros(n)
-    s_bs   = np.zeros(n)
-    foot_x = np.zeros(n)
-    foot_z = np.zeros(n)
+    if omega_knee_seq is None:
+        omega_knee_seq = np.zeros(n)
 
-    for i, (th, tk) in enumerate(zip(theta_hip_seq, theta_knee_seq)):
-        tau_k[i] = knee_torque_static(th, tk, body_mass=body_mass)
-        f_bs[i]  = ballscrew_force(th, tk, body_mass=body_mass)
-        tau_m[i] = motor_torque_from_force(f_bs[i])
-        s_bs[i]  = ballscrew_length(tk)
+    tau_k   = np.zeros(n)
+    f_nut   = np.zeros(n)
+    tau_m   = np.zeros(n)
+    rpm_m   = np.zeros(n)
+    pwr_m   = np.zeros(n)
+    lever   = np.zeros(n)
+    y_nut   = np.zeros(n)
+    foot_x  = np.zeros(n)
+    foot_z  = np.zeros(n)
+
+    for i, (th, tk, ok) in enumerate(
+        zip(theta_hip_seq, theta_knee_seq, omega_knee_seq)
+    ):
+        tau_k[i]  = knee_torque_static(th, tk, body_mass=body_mass)
+        f_nut[i]  = nut_force_required(th, tk, body_mass=body_mass)
+        tau_m[i]  = motor_torque_from_nut_force(f_nut[i])
+        rpm_m[i]  = motor_speed_rpm(tk, ok)
+        pwr_m[i]  = motor_power(tk, ok, f_nut[i])
+        lever[i]  = nut_lever_arm(tk)
+        y_nut[i]  = nut_position(tk)
         fk = forward_kinematics(th, tk)
         foot_x[i], foot_z[i] = fk["foot_pos"]
 
     return {
-        "tau_knee":        tau_k,
-        "ballscrew_force": f_bs,
-        "motor_torque":    tau_m,
-        "ballscrew_length": s_bs,
-        "foot_x":          foot_x,
-        "foot_z":          foot_z,
+        "tau_knee":       tau_k,
+        "nut_force":      f_nut,
+        "motor_torque":   tau_m,
+        "motor_rpm":      rpm_m,
+        "motor_power_w":  pwr_m,
+        "lever_arm":      lever,
+        "nut_position_m": y_nut,
+        "foot_x":         foot_x,
+        "foot_z":         foot_z,
     }

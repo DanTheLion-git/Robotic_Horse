@@ -1,43 +1,61 @@
 """
-Leg kinematics for a 2-link leg (thigh + shank) with a linear
-ballscrew driving the knee hinge.
+Leg kinematics for a 2-link leg (thigh + shank) driven by a
+linear ballscrew knee actuator.
 
-Geometry (side view, leg hanging down):
-                 hip
-                  O  ← hip revolute joint
-                  |
-           thigh  | L1 = 0.45 m
-                  |
-                  O  ← knee revolute joint  θ_knee
-                  |
-           shank  | L2 = 0.50 m
-                  |
-                  ●  ← foot
+Physical design (side view)
+───────────────────────────
 
-The ballscrew actuator connects a pivot on the thigh (distance a
-from the knee) to a pivot on the shank (distance b from the knee).
-Actuator length s(θ) is computed by the law of cosines.
+  Motor (brushless) ──▶ spins shaft
+        │
+  ┌─────▼──────┐  ← top of upper-leg tube
+  │   shaft    │    ballscrew nut travels up/down the shaft
+  │    ▲ nut   │    nut position y_nut [m] from knee pivot height
+  │    │       │
+  │  [slot]────┼──── pivot point (knee joint) on outside of tube
+  │            │
+  └────────────┘  ← bottom of upper-leg tube
 
-                 A ── (thigh, distance a from knee)
-                 |  ╲
-              s  |    ╲ ballscrew
-                 |      ╲
-                 B ── (shank, distance b from knee)
+  The nut is connected, through the slot, to the lower leg (shank)
+  at a distance R_ARM from the knee pivot.  As the nut moves up/down
+  the shaft, it swings the shank forward/backward around the pivot.
 
-  s² = a² + b² − 2·a·b·cos(π − θ_knee)
-     = a² + b² + 2·a·b·cos(θ_knee)   (θ_knee < 0 by URDF convention)
+Virtual-work relationship (exact, no small-angle approximation)
+───────────────────────────────────────────────────────────────
+  y_nut(θ)   = R_ARM · (1 − cos θ_knee)   [nut displacement from θ=0]
+  dy/dθ      = R_ARM · sin θ_knee
+  Lever arm  = |dy/dθ| = R_ARM · |sin θ_knee|
+
+  ∴  F_nut  = τ_knee / (R_ARM · |sin θ_knee|)
+
+  Singular at θ_knee = 0 (leg fully straight — never occurs in normal gait).
+
+Coordinate convention (URDF)
+─────────────────────────────
+  θ_knee = 0   : shank aligned with thigh (straight leg)
+  θ_knee < 0   : knee bent (shank swings backward / downward)
+  θ_hip  > 0   : hip swings leg forward
 """
 
 import numpy as np
 
 
-# ── Robot constants ────────────────────────────────────────────────
-L1 = 0.45   # thigh length  [m]
-L2 = 0.50   # shank length  [m]
+# ── Leg geometry ───────────────────────────────────────────────────
+L1 = 0.45       # upper leg (thigh) length — top of tube to knee pivot  [m]
+L2 = 0.50       # lower leg (shank) length — knee pivot to foot         [m]
 
-# Ballscrew attachment points measured from knee joint centre
-BALLSCREW_A = 0.12   # pivot on thigh  [m]
-BALLSCREW_B = 0.10   # pivot on shank  [m]
+# ── Ballscrew joint geometry ───────────────────────────────────────
+R_ARM = 0.08            # distance from knee pivot to nut-connection point
+                        # on the shank (lever arm at 90° bend)          [m]
+TUBE_RADIUS = 0.03      # outer radius of the upper-leg tube             [m]
+PIVOT_FROM_BOTTOM = 0.05  # how far above the bottom of the upper-leg tube
+                          # the knee pivot sits                          [m]
+
+# Useful derived quantities
+NUT_RANGE_MIN_DEG = -10.0   # knee angle at nearly-straight (start of range) [°]
+NUT_RANGE_MAX_DEG = -100.0  # knee angle at maximum bend                     [°]
+NUT_STROKE = R_ARM * (
+    np.cos(np.radians(NUT_RANGE_MIN_DEG)) - np.cos(np.radians(NUT_RANGE_MAX_DEG))
+)  # total nut travel over working range [m]
 
 
 def forward_kinematics(theta_hip: float, theta_knee: float) -> dict:
@@ -114,30 +132,42 @@ def inverse_kinematics(foot_x: float, foot_z: float) -> tuple[float, float]:
     return theta_hip, theta_knee
 
 
-def ballscrew_length(theta_knee: float) -> float:
+def nut_position(theta_knee: float) -> float:
     """
-    Return the required ballscrew actuator length for a given knee angle.
+    Vertical position of the ballscrew nut relative to its position
+    at θ_knee = 0 (straight leg).
 
-    Parameters
-    ----------
-    theta_knee : float  Knee angle [rad], negative = bent.
+    y_nut(θ) = R_ARM · (1 − cos θ_knee)
 
     Returns
     -------
-    length [m]
+    y_nut [m]  — positive means nut has moved UP from straight-leg position
     """
-    a, b = BALLSCREW_A, BALLSCREW_B
-    # Supplement: interior angle at the knee in the actuator triangle
-    phi = np.pi + theta_knee   # theta_knee is negative → phi < π
-    length = np.sqrt(a**2 + b**2 - 2 * a * b * np.cos(phi))
-    return length
+    return R_ARM * (1.0 - np.cos(theta_knee))
 
 
-def ballscrew_velocity(theta_knee: float, omega_knee: float) -> float:
+def nut_lever_arm(theta_knee: float) -> float:
     """
-    Return ballscrew linear velocity from knee angular velocity.
+    Effective lever arm of the nut force about the knee pivot.
 
-    ds/dt = (ds/dθ) · ω
+    lever(θ) = |dy_nut/dθ| = R_ARM · |sin θ_knee|
+
+    This is the perpendicular distance from the pivot to the line of
+    action of the nut force (vertical), and it determines how much
+    torque a given nut force produces (and vice-versa).
+
+    Returns
+    -------
+    lever [m]  — 0 at fully straight leg (singular), maximum at 90° bend
+    """
+    return R_ARM * abs(np.sin(theta_knee))
+
+
+def nut_velocity(theta_knee: float, omega_knee: float) -> float:
+    """
+    Linear velocity of the ballscrew nut from knee angular velocity.
+
+    v_nut = (dy_nut/dθ) · ω = R_ARM · sin(θ_knee) · ω
 
     Parameters
     ----------
@@ -146,10 +176,22 @@ def ballscrew_velocity(theta_knee: float, omega_knee: float) -> float:
 
     Returns
     -------
-    linear velocity [m/s]
+    v_nut [m/s]  — positive = nut moving up
     """
-    a, b = BALLSCREW_A, BALLSCREW_B
-    phi = np.pi + theta_knee
-    s = ballscrew_length(theta_knee)
-    ds_dtheta = (a * b * np.sin(phi)) / s
-    return ds_dtheta * omega_knee
+    return R_ARM * np.sin(theta_knee) * omega_knee
+
+
+def nut_stroke_for_range(theta_min: float, theta_max: float) -> float:
+    """
+    Required nut travel for a given knee angle range.
+
+    Parameters
+    ----------
+    theta_min : float  Start angle [rad]
+    theta_max : float  End angle   [rad]
+
+    Returns
+    -------
+    stroke [m]
+    """
+    return abs(nut_position(theta_max) - nut_position(theta_min))

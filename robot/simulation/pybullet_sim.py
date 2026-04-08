@@ -15,6 +15,7 @@ from robot.gait.walk_gait import generate_gait_trajectory, LEG_NAMES
 from robot.kinematics.force_calculator import (
     analyse_gait_forces,
     M_BODY,
+    CARRIAGE_DRAG_N,
 )
 
 URDF_PATH = os.path.join(
