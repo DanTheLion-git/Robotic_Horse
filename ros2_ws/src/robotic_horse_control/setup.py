@@ -16,6 +16,8 @@ setup(
             glob('launch/*.py')),
         (os.path.join('share', package_name, 'config'),
             glob('config/*.yaml')),
+        (os.path.join('share', package_name, 'animations'),
+            glob('animations/*.json') + glob('animations/*.yaml')),
         (os.path.join('share', package_name, 'worlds'),
             glob('worlds/*.world')),
     ],
@@ -27,8 +29,9 @@ setup(
     license='MIT',
     entry_points={
         'console_scripts': [
-            'gait_node  = robotic_horse_control.gait_node:main',
-            'force_node = robotic_horse_control.force_node:main',
+            'gait_node        = robotic_horse_control.gait_node:main',
+            'force_node       = robotic_horse_control.force_node:main',
+            'blendspace_node  = robotic_horse_control.blendspace_node:main',
         ],
     },
 )
