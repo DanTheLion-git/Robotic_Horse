@@ -37,8 +37,8 @@ BANNER = """
 ╠══════════════════════════════════════╣
 ║  W — Forward      S — Backward       ║
 ║  A — Turn Left    D — Turn Right     ║
-║  Q — Toggle Gait  SPACE — Stop       ║
-║  Ctrl-C — Quit                       ║
+║  Q — Cycle Gait: Walk→Trot→Gallop    ║
+║  SPACE — Stop     Ctrl-C — Quit      ║
 ╚══════════════════════════════════════╝
 """
 
@@ -59,18 +59,21 @@ def _get_key(timeout: float = 0.1) -> str:
 
 class TeleopKey(Node):
 
+    GAIT_SEQUENCE = ['trot', 'gallop', 'walk']   # cycle starting from trot
+
     def __init__(self):
         super().__init__('teleop_key')
         self._pub      = self.create_publisher(Twist,  '/cmd_vel',  10)
         self._gait_pub = self.create_publisher(String, '/cmd_gait', 10)
-        self._current_gait = 'trot'
+        self._gait_idx = 0   # start at trot (index 0 in GAIT_SEQUENCE)
 
     def _toggle_gait(self):
-        self._current_gait = 'gallop' if self._current_gait == 'trot' else 'trot'
+        self._gait_idx = (self._gait_idx + 1) % len(self.GAIT_SEQUENCE)
+        mode = self.GAIT_SEQUENCE[self._gait_idx]
         msg = String()
-        msg.data = self._current_gait
+        msg.data = mode
         self._gait_pub.publish(msg)
-        print(f'\r  Gait → {self._current_gait.upper():<10}', end='', flush=True)
+        print(f'\r  Gait -> {mode.upper():<10}', end='', flush=True)
 
     def run(self):
         print(BANNER)

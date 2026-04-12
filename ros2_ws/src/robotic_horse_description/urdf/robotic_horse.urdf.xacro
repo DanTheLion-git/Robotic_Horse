@@ -249,11 +249,12 @@
   <!-- ═══════════════════════════════════════════════════════
        BASE LINK
   ═══════════════════════════════════════════════════════ -->
+  <!-- Elk animatronic body: 28kg (frame 12kg + main motors 10kg + costume 6kg) -->
   <link name="base_link">
     <inertial>
-      <mass value="20.0"/>
+      <mass value="28.0"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.138" iyy="1.075" izz="1.140" ixy="0" ixz="0" iyz="0"/>
+      <inertia ixx="0.356" iyy="1.289" izz="1.353" ixy="0" ixz="0" iyz="0"/>
     </inertial>
     <!-- Main body panel -->
     <visual>
@@ -288,8 +289,8 @@
 
   <!-- ── FRONT-LEFT ── -->
   <link name="fl_hip_link">
-    <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="2.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.003" iyy="0.003" izz="0.004" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 -0.05" rpy="0 0 0"/>
       <geometry><cylinder radius="0.04" length="0.10"/></geometry><material name="silver"/></visual>
     <collision><origin xyz="0 0 -0.04" rpy="0 0 0"/>
@@ -300,13 +301,13 @@
     <origin xyz="0.35 0.18 -0.05" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
-    <dynamics damping="0.5" friction="0.1"/>
+    <dynamics damping="2.5" friction="0.3"/>
   </joint>
   <gazebo reference="fl_hip_link"><material>Gazebo/Grey</material></gazebo>
 
   <link name="fl_thigh_link">
-    <inertial><mass value="1.5"/><origin xyz="0 0 -0.225" rpy="0 0 0"/>
-      <inertia ixx="0.025" iyy="0.025" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="3.5"/><origin xyz="0 0 -0.225" rpy="0 0 0"/>
+      <inertia ixx="0.061" iyy="0.061" izz="0.004" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 -0.225" rpy="0 0 0"/>
       <geometry><box size="0.04 0.04 0.45"/></geometry><material name="orange"/></visual>
     <!-- Ballscrew actuator tube -->
@@ -319,13 +320,13 @@
     <parent link="fl_hip_link"/><child link="fl_thigh_link"/>
     <origin xyz="0 0 -0.08" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.2" upper="0.5" effort="500" velocity="3.0"/>
-    <dynamics damping="0.5" friction="0.1"/>
+    <dynamics damping="2.5" friction="0.3"/>
   </joint>
   <gazebo reference="fl_thigh_link"><material>Gazebo/Orange</material></gazebo>
 
   <link name="fl_shank_link">
-    <inertial><mass value="1.0"/><origin xyz="0 0 -0.25" rpy="0 0 0"/>
-      <inertia ixx="0.021" iyy="0.021" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="2.5"/><origin xyz="0 0 -0.25" rpy="0 0 0"/>
+      <inertia ixx="0.053" iyy="0.053" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 -0.25" rpy="0 0 0">
       </origin><geometry><box size="0.035 0.035 0.50"/></geometry><material name="dark_grey"/></visual>
     <collision><origin xyz="0 0 -0.25" rpy="0 0 0">
@@ -335,13 +336,13 @@
     <parent link="fl_thigh_link"/><child link="fl_shank_link"/>
     <origin xyz="0 0 -0.45" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-0.1" upper="2.0" effort="800" velocity="5.0"/>
-    <dynamics damping="0.8" friction="0.1"/>
+    <dynamics damping="3.5" friction="0.3"/>
   </joint>
   <gazebo reference="fl_shank_link"><material>Gazebo/DarkGrey</material></gazebo>
 
   <link name="fl_foot_link">
-    <inertial><mass value="0.2"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.0001" iyy="0.0001" izz="0.0001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="0.4"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00026" iyy="0.00026" izz="0.00026" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry><sphere radius="0.04"/></geometry><material name="black"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/>
@@ -359,8 +360,8 @@
 
   <!-- ── FRONT-RIGHT ── -->
   <link name="fr_hip_link">
-    <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="2.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.003" iyy="0.003" izz="0.004" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 -0.05" rpy="0 0 0"/>
       <geometry><cylinder radius="0.04" length="0.10"/></geometry><material name="silver"/></visual>
     <collision><origin xyz="0 0 -0.04" rpy="0 0 0">
@@ -371,12 +372,12 @@
     <origin xyz="0.35 -0.18 -0.05" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
-    <dynamics damping="0.5" friction="0.1"/>
+    <dynamics damping="2.5" friction="0.3"/>
   </joint>
   <gazebo reference="fr_hip_link"><material>Gazebo/Grey</material></gazebo>
   <link name="fr_thigh_link">
-    <inertial><mass value="1.5"/><origin xyz="0 0 -0.225" rpy="0 0 0"/>
-      <inertia ixx="0.025" iyy="0.025" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="3.5"/><origin xyz="0 0 -0.225" rpy="0 0 0"/>
+      <inertia ixx="0.061" iyy="0.061" izz="0.004" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 -0.225" rpy="0 0 0">
       </origin><geometry><box size="0.04 0.04 0.45"/></geometry><material name="orange"/></visual>
     <!-- Ballscrew actuator tube -->
@@ -389,12 +390,12 @@
     <parent link="fr_hip_link"/><child link="fr_thigh_link"/>
     <origin xyz="0 0 -0.08" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.2" upper="0.5" effort="500" velocity="3.0"/>
-    <dynamics damping="0.5" friction="0.1"/>
+    <dynamics damping="2.5" friction="0.3"/>
   </joint>
   <gazebo reference="fr_thigh_link"><material>Gazebo/Orange</material></gazebo>
   <link name="fr_shank_link">
-    <inertial><mass value="1.0"/><origin xyz="0 0 -0.25" rpy="0 0 0"/>
-      <inertia ixx="0.021" iyy="0.021" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="2.5"/><origin xyz="0 0 -0.25" rpy="0 0 0"/>
+      <inertia ixx="0.053" iyy="0.053" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 -0.25" rpy="0 0 0">
       </origin><geometry><box size="0.035 0.035 0.50"/></geometry><material name="dark_grey"/></visual>
     <collision><origin xyz="0 0 -0.25" rpy="0 0 0">
@@ -404,12 +405,12 @@
     <parent link="fr_thigh_link"/><child link="fr_shank_link"/>
     <origin xyz="0 0 -0.45" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-0.1" upper="2.0" effort="800" velocity="5.0"/>
-    <dynamics damping="0.8" friction="0.1"/>
+    <dynamics damping="3.5" friction="0.3"/>
   </joint>
   <gazebo reference="fr_shank_link"><material>Gazebo/DarkGrey</material></gazebo>
   <link name="fr_foot_link">
-    <inertial><mass value="0.2"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.0001" iyy="0.0001" izz="0.0001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="0.4"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00026" iyy="0.00026" izz="0.00026" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry><sphere radius="0.04"/></geometry><material name="black"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/>
@@ -426,8 +427,8 @@
 
   <!-- ── REAR-LEFT ── -->
   <link name="rl_hip_link">
-    <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="2.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.003" iyy="0.003" izz="0.004" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 -0.05" rpy="0 0 0"/>
       <geometry><cylinder radius="0.04" length="0.10"/></geometry><material name="silver"/></visual>
     <collision><origin xyz="0 0 -0.04" rpy="0 0 0">
@@ -438,12 +439,12 @@
     <origin xyz="-0.35 0.18 -0.05" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
-    <dynamics damping="0.5" friction="0.1"/>
+    <dynamics damping="2.5" friction="0.3"/>
   </joint>
   <gazebo reference="rl_hip_link"><material>Gazebo/Grey</material></gazebo>
   <link name="rl_thigh_link">
-    <inertial><mass value="1.5"/><origin xyz="0 0 -0.225" rpy="0 0 0"/>
-      <inertia ixx="0.025" iyy="0.025" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="3.5"/><origin xyz="0 0 -0.225" rpy="0 0 0"/>
+      <inertia ixx="0.061" iyy="0.061" izz="0.004" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 -0.225" rpy="0 0 0">
       </origin><geometry><box size="0.04 0.04 0.45"/></geometry><material name="orange"/></visual>
     <!-- Ballscrew actuator tube -->
@@ -456,12 +457,12 @@
     <parent link="rl_hip_link"/><child link="rl_thigh_link"/>
     <origin xyz="0 0 -0.08" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.2" upper="0.5" effort="500" velocity="3.0"/>
-    <dynamics damping="0.5" friction="0.1"/>
+    <dynamics damping="2.5" friction="0.3"/>
   </joint>
   <gazebo reference="rl_thigh_link"><material>Gazebo/Orange</material></gazebo>
   <link name="rl_shank_link">
-    <inertial><mass value="1.0"/><origin xyz="0 0 -0.25" rpy="0 0 0"/>
-      <inertia ixx="0.021" iyy="0.021" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="2.5"/><origin xyz="0 0 -0.25" rpy="0 0 0"/>
+      <inertia ixx="0.053" iyy="0.053" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 -0.25" rpy="0 0 0">
       </origin><geometry><box size="0.035 0.035 0.50"/></geometry><material name="dark_grey"/></visual>
     <collision><origin xyz="0 0 -0.25" rpy="0 0 0">
@@ -471,12 +472,12 @@
     <parent link="rl_thigh_link"/><child link="rl_shank_link"/>
     <origin xyz="0 0 -0.45" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-0.1" upper="2.0" effort="800" velocity="5.0"/>
-    <dynamics damping="0.8" friction="0.1"/>
+    <dynamics damping="3.5" friction="0.3"/>
   </joint>
   <gazebo reference="rl_shank_link"><material>Gazebo/DarkGrey</material></gazebo>
   <link name="rl_foot_link">
-    <inertial><mass value="0.2"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.0001" iyy="0.0001" izz="0.0001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="0.4"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00026" iyy="0.00026" izz="0.00026" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry><sphere radius="0.04"/></geometry><material name="black"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/>
@@ -493,8 +494,8 @@
 
   <!-- ── REAR-RIGHT ── -->
   <link name="rr_hip_link">
-    <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="2.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.003" iyy="0.003" izz="0.004" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 -0.05" rpy="0 0 0"/>
       <geometry><cylinder radius="0.04" length="0.10"/></geometry><material name="silver"/></visual>
     <collision><origin xyz="0 0 -0.04" rpy="0 0 0">
@@ -505,12 +506,12 @@
     <origin xyz="-0.35 -0.18 -0.05" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
-    <dynamics damping="0.5" friction="0.1"/>
+    <dynamics damping="2.5" friction="0.3"/>
   </joint>
   <gazebo reference="rr_hip_link"><material>Gazebo/Grey</material></gazebo>
   <link name="rr_thigh_link">
-    <inertial><mass value="1.5"/><origin xyz="0 0 -0.225" rpy="0 0 0"/>
-      <inertia ixx="0.025" iyy="0.025" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="3.5"/><origin xyz="0 0 -0.225" rpy="0 0 0"/>
+      <inertia ixx="0.061" iyy="0.061" izz="0.004" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 -0.225" rpy="0 0 0">
       </origin><geometry><box size="0.04 0.04 0.45"/></geometry><material name="orange"/></visual>
     <!-- Ballscrew actuator tube -->
@@ -523,12 +524,12 @@
     <parent link="rr_hip_link"/><child link="rr_thigh_link"/>
     <origin xyz="0 0 -0.08" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.2" upper="0.5" effort="500" velocity="3.0"/>
-    <dynamics damping="0.5" friction="0.1"/>
+    <dynamics damping="2.5" friction="0.3"/>
   </joint>
   <gazebo reference="rr_thigh_link"><material>Gazebo/Orange</material></gazebo>
   <link name="rr_shank_link">
-    <inertial><mass value="1.0"/><origin xyz="0 0 -0.25" rpy="0 0 0"/>
-      <inertia ixx="0.021" iyy="0.021" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="2.5"/><origin xyz="0 0 -0.25" rpy="0 0 0"/>
+      <inertia ixx="0.053" iyy="0.053" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 -0.25" rpy="0 0 0">
       </origin><geometry><box size="0.035 0.035 0.50"/></geometry><material name="dark_grey"/></visual>
     <collision><origin xyz="0 0 -0.25" rpy="0 0 0">
@@ -538,12 +539,12 @@
     <parent link="rr_thigh_link"/><child link="rr_shank_link"/>
     <origin xyz="0 0 -0.45" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-0.1" upper="2.0" effort="800" velocity="5.0"/>
-    <dynamics damping="0.8" friction="0.1"/>
+    <dynamics damping="3.5" friction="0.3"/>
   </joint>
   <gazebo reference="rr_shank_link"><material>Gazebo/DarkGrey</material></gazebo>
   <link name="rr_foot_link">
-    <inertial><mass value="0.2"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.0001" iyy="0.0001" izz="0.0001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="0.4"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00026" iyy="0.00026" izz="0.00026" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry><sphere radius="0.04"/></geometry><material name="black"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/>

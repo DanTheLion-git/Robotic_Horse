@@ -688,3 +688,69 @@ ros2 topic pub --once /cmd_gait std_msgs/String "data: 'trot'"
 | CONTACT_EFFORT_THRESHOLD | blendspace_node.py | 40 Nm | Knee effort for early stance |
 | TURNING | teleop_key.py | 0.8 rad/s | Turn rate from A/D keys |
 | cart_to_shaft_steer gains | ros2_control.yaml | p=800 d=80 | Steering responsiveness |
+
+---
+
+## Section 11 — Elk Animatronic Physics + Gait Update
+
+### Realistic weight (anti-bounce fix)
+
+The bouncy/rocking behaviour was caused by the body mass being too low (20 kg total).
+Updated to simulate a realistic elk animatronic:
+
+| Link | Old | New | Represents |
+|------|-----|-----|------------|
+| base_link | 20 kg | 28 kg | Main frame + body motors + elk costume + electronics |
+| Each hip x4 | 0.5 kg | 2.0 kg | Hip yaw servo + bracket |
+| Each thigh x4 | 1.5 kg | 3.5 kg | Upper leg actuator + structure + foam |
+| Each shank x4 | 1.0 kg | 2.5 kg | Ballscrew knee + lower leg |
+| Each foot x4 | 0.2 kg | 0.4 kg | Hoof |
+| **Total horse** | **~34 kg** | **~62 kg** | Full elk animatronic |
+
+All inertia tensors recomputed from correct geometry. Leg joint damping
+increased (hip: 2.5, knee: 3.5) and PID gains scaled proportionally.
+
+### Three elk-accurate gaits
+
+| Gait | Period | Swing | Step H | Footfall sequence |
+|------|--------|-------|--------|-------------------|
+| WALK | 1.6 s | 35% | 0.12 m | RL -> FL -> RR -> FR (lateral, 0.25 apart) |
+| TROT | 0.9 s | 50% | 0.17 m | FL+RR, then FR+RL (brief suspension) |
+| GALLOP | 0.5 s | 55% | 0.22 m | FL -> RL -> FR -> RR (rotary gallop) |
+
+WALK is a true 4-beat lateral walk: 3 feet always on the ground.
+TROT has a brief suspension phase (swing = stance fraction).
+GALLOP uses rotary gallop where hind legs reach past fore legs between bounds.
+
+### Elk step profile
+
+Every swing arc uses an elk-inspired trajectory:
+- Height peaks at ~40% into swing: `sin(pi * p^0.7)` — foot dwells high
+- Forward swing is delayed: `p^1.3` — leg lifts UP before swinging FORWARD
+
+### Controls
+
+| Key | Action |
+|-----|--------|
+| Q | Cycle: WALK -> TROT -> GALLOP -> WALK |
+| W / S | Forward / Backward |
+| A / D | Turn left / right |
+| SPACE | Stop |
+
+```bash
+# Set gait from another terminal:
+ros2 topic pub --once /cmd_gait std_msgs/String "data: 'walk'"
+ros2 topic pub --once /cmd_gait std_msgs/String "data: 'trot'"
+ros2 topic pub --once /cmd_gait std_msgs/String "data: 'gallop'"
+```
+
+### PID tuning reference (62 kg elk)
+
+| Joint | p | d | Notes |
+|-------|---|---|-------|
+| cart_to_shaft_steer | 1200 | 100 | Increase if cart steering lags |
+| hip joints | 250 | 15 | Shoulder yaw |
+| thigh joints | 500 | 30 | Upper leg |
+| knee joints | 800 | 50 | Lower leg / ballscrew |
+
+If the robot still bounces: increase d gains by 50% steps until stable.
