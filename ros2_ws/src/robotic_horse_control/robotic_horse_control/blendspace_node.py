@@ -31,46 +31,46 @@ from builtin_interfaces.msg import Duration
 
 # ── Robot geometry (must match URDF exactly) ─────────────────────────────────
 # Large male red deer — 1:1 scale, withers ~1.55m
-L1 = 0.38           # thigh length        [m]  (was 0.60, reduced for proper deer ratio)
-L2 = 0.36           # shank length        [m]  (was 0.60)
-L3 = 0.25           # cannon bone length  [m]  (was 0.35)
-CANNON_LEAN = 0.15  # cannon forward lean [rad] (~8.6 deg)
-FOOT_R = 0.05       # hoof radius         [m]  (was 0.06)
+L1 = 0.28           # thigh length  [m]  (Percheron-inspired: shorter, more compact)
+L2 = 0.26           # shank length  [m]
+L3 = 0.16           # cannon length [m]
+CANNON_LEAN = 0.10  # cannon forward lean [rad]
+FOOT_R = 0.04       # hoof radius   [m]
 
 # Hip joint (thigh_joint) height from ground at nominal settled pose.
-# body_center = 1.27m, hip_Z_from_body = -0.22m, bracket = -0.10m
-# → thigh_joint = 1.27 - 0.22 - 0.10 = 0.95m
-BODY_HEIGHT  = 0.95
-ANKLE_HEIGHT = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # 0.6528 m
+# spawn_z=1.02m, hip_z_from_body=-0.20m, bracket=-0.10m → thigh_joint=0.72m
+# FK verified: L1*cos(0.25)+L2*cos(-0.30)+L3*cos(0.10)+FOOT_R = 0.719m ≈ 0.72
+BODY_HEIGHT  = 0.72
+ANKLE_HEIGHT = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # 0.521 m
 
 # Hip positions in base_link (x=fwd, y=left, z=up)
-# Body: 1.10m L × 0.38m W × 0.55m H; hip joints near belly at z=-0.22, x=±0.43, y=±0.19
+# Body: 1.10m L × 0.55m W; hip joints at z=-0.20, x=±0.43, y=±0.25
 LEG_POS = {
-    'fl': ( 0.43,  0.19),
-    'fr': ( 0.43, -0.19),
-    'rl': (-0.43,  0.19),
-    'rr': (-0.43, -0.19),
+    'fl': ( 0.43,  0.25),
+    'fr': ( 0.43, -0.25),
+    'rl': (-0.43,  0.25),
+    'rr': (-0.43, -0.25),
 }
 HALF_BODY_LENGTH = 0.43
 
 FRONT_LEGS = ('fl', 'fr')
 REAR_LEGS  = ('rl', 'rr')
 
-# ── Neutral poses (computed from IK at ankle straight down) ──────────────────
-# ANKLE_HEIGHT=0.6528, L1=0.38, L2=0.36: knee=-0.981rad(56deg), thigh=+/-0.476rad
-NEUTRAL_THIGH_FRONT  = +0.476
-NEUTRAL_KNEE_FRONT   = -0.981
-NEUTRAL_CANNON_FRONT = +0.655   # CANNON_LEAN - (0.476 + -0.981) = 0.15 + 0.505 = 0.655
+# ── Neutral poses (Percheron: shorter knee bend, Spot-like compact stance) ────
+# cannon = CANNON_LEAN - (thigh + knee): front=0.10-(0.25+-0.55)=0.40, rear=0.10-(-0.25+0.55)=-0.20
+NEUTRAL_THIGH_FRONT  = +0.25
+NEUTRAL_KNEE_FRONT   = -0.55
+NEUTRAL_CANNON_FRONT = +0.40
 
-NEUTRAL_THIGH_REAR   = -0.476
-NEUTRAL_KNEE_REAR    = +0.981
-NEUTRAL_CANNON_REAR  = -0.355   # CANNON_LEAN - (-0.476 + 0.981) = 0.15 - 0.505 = -0.355
+NEUTRAL_THIGH_REAR   = -0.25
+NEUTRAL_KNEE_REAR    = +0.55
+NEUTRAL_CANNON_REAR  = -0.20
 
 # ── Elk gait parameters ───────────────────────────────────────────────────────
 WALK = dict(
     phase_offsets={'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
     swing_frac=0.22,
-    step_height=0.20,   # base foot clearance — pitch compensation adds on top
+    step_height=0.15,   # base foot clearance — pitch compensation adds on top
     min_stride=0.25,    # m — large step even at slow pace (50 cm full stride)
     period=1.6,
     name='WALK',
@@ -79,7 +79,7 @@ WALK = dict(
 TROT = dict(
     phase_offsets={'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0},
     swing_frac=0.32,
-    step_height=0.35,
+    step_height=0.25,
     min_stride=0.35,
     period=0.90,
     name='TROT',
@@ -88,7 +88,7 @@ TROT = dict(
 GALLOP = dict(
     phase_offsets={'fl': 0.0, 'rl': 0.15, 'fr': 0.50, 'rr': 0.65},
     swing_frac=0.42,
-    step_height=0.55,
+    step_height=0.40,
     min_stride=0.50,
     period=0.50,
     name='GALLOP',
@@ -120,7 +120,7 @@ PITCH_STEP_SCALE = 1.2
 BALANCE_FOOT_GAIN = 0.25   # m shift per rad of lean
 
 # Minimum step height so rear legs never drop to zero clearance.
-MIN_STEP_HEIGHT = 0.10    # m
+MIN_STEP_HEIGHT = 0.07    # m
 
 CONTACT_EFFORT_THRESHOLD = 45.0
 CONTACT_MIN_SWING_FRAC   = 0.45
