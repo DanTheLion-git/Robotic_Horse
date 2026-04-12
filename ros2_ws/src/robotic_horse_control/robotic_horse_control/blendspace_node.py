@@ -1,23 +1,19 @@
 """
-blendspace_node.py  —  Elk-accurate velocity-driven gait controller (v5).
+blendspace_node.py  —  Highland Cow velocity-driven gait controller.
 
-Red deer (Cervus elaphus) large prime male — accurate 1:1 dimensions:
-  Withers (back): ~1.55 m   Belly height: ~1.00 m
-  Thigh (L1)    : 0.38 m    Lower leg (L2): 0.36 m
-  Cannon (L3)   : 0.25 m    Hoof radius:    0.05 m
-  Knee bend      : 56 deg at neutral — natural deer standing pose
+Highland Cattle (Bos taurus) — compact stocky proportions:
+  Shoulder height: ~97 cm   Body: 1.40 × 0.60 × 0.40 m, 400 kg
+  Thigh (L1)     : 0.20 m   Shank (L2): 0.18 m
+  Cannon (L3)    : 0.10 m   Hoof radius: 0.04 m
+  FK hip height  : 0.506 m  (at neutral stance)
 
 Leg configuration:
   FRONT (FL/FR): elbow-DOWN — carpal bends FORWARD (away from cart)
   REAR  (RL/RR): elbow-UP   — hock bends BACKWARD  (toward cart)
   Cannon bone pantograph: cannon = CANNON_LEAN - (thigh + knee)
 
-Gait auto-selection by speed:
-  0 – 1.5 m/s  → WALK   (4-beat lateral, elk deliberate step)
-  1.5 – 3.5 m/s → TROT   (diagonal suspension trot)
-  > 3.5 m/s    → GALLOP (rotary gallop, hind legs reach through)
-
-No backward movement — speed is clamped to [0, MAX_SPEED].
+Gait discrete state machine (W=advance, S=decrease, SPACE=IDLE):
+  IDLE → WALK (0.8 m/s, 4-beat lateral) → TROT (1.8 m/s, diagonal pair)
 """
 
 import math
@@ -30,86 +26,71 @@ from builtin_interfaces.msg import Duration
 
 
 # ── Robot geometry (must match URDF exactly) ─────────────────────────────────
-# Large male red deer — 1:1 scale, withers ~1.55m
-L1 = 0.28           # thigh length  [m]  (Percheron-inspired: shorter, more compact)
-L2 = 0.26           # shank length  [m]
-L3 = 0.16           # cannon length [m]
-CANNON_LEAN = 0.10  # cannon forward lean [rad]
-FOOT_R = 0.04       # hoof radius   [m]
+# Highland Cattle — 1:1 scale, shoulder ~97 cm
+L1 = 0.20           # thigh  [m]  (Highland Cow: short stocky legs)
+L2 = 0.18           # shank  [m]
+L3 = 0.10           # cannon [m]
+CANNON_LEAN = 0.08  # cannon forward lean [rad]
+FOOT_R = 0.04       # hoof radius [m]
 
-# Hip joint (thigh_joint) height from ground at nominal settled pose.
-# spawn_z=1.02m, hip_z_from_body=-0.20m, bracket=-0.10m → thigh_joint=0.72m
-# FK verified: L1*cos(0.25)+L2*cos(-0.30)+L3*cos(0.10)+FOOT_R = 0.719m ≈ 0.72
-BODY_HEIGHT  = 0.72
-ANKLE_HEIGHT = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # 0.521 m
+# Hip joint (thigh_joint) height from ground at nominal pose.
+# FK: L1*cos(0.25)+L2*cos(-0.30)+L3*cos(0.08)+FOOT_R = 0.506m
+BODY_HEIGHT  = 0.506
+ANKLE_HEIGHT = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # = 0.366m
 
 # Hip positions in base_link (x=fwd, y=left, z=up)
-# Body: 1.10m L × 0.55m W; hip joints at z=-0.20, x=±0.43, y=±0.25
+# Body: 1.40m L × 0.60m W; hip joints at z=-0.16, x=±0.48, y=±0.24
 LEG_POS = {
-    'fl': ( 0.43,  0.25),
-    'fr': ( 0.43, -0.25),
-    'rl': (-0.43,  0.25),
-    'rr': (-0.43, -0.25),
+    'fl': ( 0.48,  0.24),
+    'fr': ( 0.48, -0.24),
+    'rl': (-0.48,  0.24),
+    'rr': (-0.48, -0.24),
 }
-HALF_BODY_LENGTH = 0.43
+HALF_BODY_LENGTH = 0.48
 
 FRONT_LEGS = ('fl', 'fr')
 REAR_LEGS  = ('rl', 'rr')
 
-# ── Neutral poses (Percheron: shorter knee bend, Spot-like compact stance) ────
-# cannon = CANNON_LEAN - (thigh + knee): front=0.10-(0.25+-0.55)=0.40, rear=0.10-(-0.25+0.55)=-0.20
+# Neutral angles for Highland Cow compact stance
+# cannon = CANNON_LEAN - (thigh + knee): front=0.08-(0.25-0.55)=0.38, rear=0.08-(-0.25+0.55)=-0.22
 NEUTRAL_THIGH_FRONT  = +0.25
 NEUTRAL_KNEE_FRONT   = -0.55
-NEUTRAL_CANNON_FRONT = +0.40
+NEUTRAL_CANNON_FRONT = +0.38
 
 NEUTRAL_THIGH_REAR   = -0.25
 NEUTRAL_KNEE_REAR    = +0.55
-NEUTRAL_CANNON_REAR  = -0.20
+NEUTRAL_CANNON_REAR  = -0.22
 
-# ── Elk gait parameters ───────────────────────────────────────────────────────
+# ── Highland Cow gait parameters ──────────────────────────────────────────────
 WALK = dict(
     phase_offsets={'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
     swing_frac=0.22,
-    step_height=0.15,   # base foot clearance — pitch compensation adds on top
-    min_stride=0.25,    # m — large step even at slow pace (50 cm full stride)
-    period=1.6,
+    step_height=0.16,
+    min_stride=0.22,
+    period=2.2,
     name='WALK',
 )
 
 TROT = dict(
     phase_offsets={'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0},
-    swing_frac=0.32,
-    step_height=0.25,
-    min_stride=0.35,
-    period=0.90,
+    swing_frac=0.35,
+    step_height=0.22,
+    min_stride=0.28,
+    period=0.9,
     name='TROT',
 )
 
-GALLOP = dict(
-    phase_offsets={'fl': 0.0, 'rl': 0.15, 'fr': 0.50, 'rr': 0.65},
-    swing_frac=0.42,
-    step_height=0.40,
-    min_stride=0.50,
-    period=0.50,
-    name='GALLOP',
-)
+GAIT_SEQUENCE = [WALK, TROT]
 
-GAIT_SEQUENCE = [WALK, TROT, GALLOP]
-
-# ── Gait auto-selection speed thresholds ─────────────────────────────────────
-WALK_MAX_SPEED   = 1.5   # m/s — below this: WALK
-TROT_MAX_SPEED   = 3.5   # m/s — below this: TROT, above: GALLOP
+# Fixed speeds per gait state (teleop sends these exact values)
+WALK_SPEED    = 0.8   # m/s — speed used when in WALK state
+TROT_SPEED    = 1.8   # m/s — speed used when in TROT state
+IDLE_THRESHOLD = 0.05 # linear.x below this = IDLE
+TROT_THRESHOLD = 1.5  # linear.x above this = TROT, else WALK
 
 # ── Control limits ────────────────────────────────────────────────────────────
-MAX_SPEED    = 6.0    # m/s  hard cap
-MAX_SHOULDER = 0.20   # rad  max hip Z-yaw from IK
-MAX_STEP     = 0.55   # m    hard cap on stride half-length
-
-# Minimum stride half-length per gait: steps stay large even at slow pace.
-# Speed controls cadence (how often steps happen), not step size.
-WALK_MIN_STRIDE   = 0.25  # m   50 cm full stride minimum at walk
-TROT_MIN_STRIDE   = 0.35  # m   70 cm full stride minimum at trot
-GALLOP_MIN_STRIDE = 0.50  # m  100 cm full stride minimum at gallop
+MAX_SHOULDER = 0.20   # rad  max hip Z-yaw
+MAX_STEP     = 0.45   # m    hard cap on stride half-length
 
 # Pitch-adaptive step height: lx * sin(pitch) * this scale added to each leg.
 # Front legs (lx>0): lean forward → step HIGHER. Rear (lx<0): lean forward → lower.
@@ -339,39 +320,37 @@ class BlendspaceNode(Node):
             self._gait['period'] / 2.0, self._tick)
 
         self.get_logger().info('=' * 60)
-        self.get_logger().info('  Elk Blendspace v5  —  No cart, IMU self-balance')
+        self.get_logger().info('  Highland Cow Blendspace  —  Discrete W/S gait states')
         self.get_logger().info('  Bidirectional pitch-adaptive step heights')
         self.get_logger().info('  Minimum stride enforced: large steps at slow pace')
-        self.get_logger().info('  Speed: 0-1.5=WALK  1.5-3.5=TROT  >3.5=GALLOP')
+        self.get_logger().info('  W = WALK  |  W again = TROT  |  S = step back  |  SPACE = IDLE')
         self.get_logger().info('=' * 60)
 
     # ── Callbacks ──────────────────────────────────────────────────────────
 
     def _cmd_vel_cb(self, msg: Twist):
-        self._linear_x  = max(0.0, min(MAX_SPEED, msg.linear.x))
+        v = msg.linear.x
         self._angular_z = msg.angular.z
-        self._auto_select_gait()
+        # Discrete state machine: teleop sends 0.0=IDLE, 0.8=WALK, 1.8=TROT
+        if v < IDLE_THRESHOLD:
+            self._linear_x = 0.0
+            new_idx = 0
+        elif v < TROT_THRESHOLD:
+            self._linear_x = WALK_SPEED
+            new_idx = 0
+        else:
+            self._linear_x = TROT_SPEED
+            new_idx = 1
+        if new_idx != self._gait_idx:
+            self._gait_idx = new_idx
+            self._gait = GAIT_SEQUENCE[new_idx].copy()
+            self._update_timer()
+            self.get_logger().info(f'Gait: {self._gait["name"]}')
 
     def _imu_cb(self, msg: Imu):
         self._body_pitch, self._body_roll = _quaternion_to_pitch_roll(msg.orientation)
 
-    def _auto_select_gait(self):
-        v = self._linear_x
-        if v < WALK_MAX_SPEED:
-            new_idx = 0
-        elif v < TROT_MAX_SPEED:
-            new_idx = 1
-        else:
-            new_idx = 2
-
-        if new_idx != self._gait_idx:
-            self._gait_idx = new_idx
-            self._gait     = GAIT_SEQUENCE[new_idx].copy()
-            self._reschedule_timer()
-            self.get_logger().info(
-                f"Auto gait -> {self._gait['name']}  (v={v:.2f} m/s)")
-
-    def _reschedule_timer(self):
+    def _update_timer(self):
         self._gait_timer.cancel()
         self._gait_timer = self.create_timer(
             self._gait['period'] / 2.0, self._tick)

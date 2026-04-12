@@ -69,14 +69,14 @@ def generate_launch_description():
 
     # ── Spawn the robot into Gazebo ───────────────────────────────────
     # base_link is horse root (free-standing). Cart hangs from rope chain.
-    # spawn z=1.02m: hip_joint=1.02-0.20-0.10=0.72m → feet at ~0m (FK verified).
+    # spawn z=0.77m: hip_height=0.506m + hip_z_offset=0.16 + bracket=0.10 = 0.766 ≈ 0.77m (FK verified).
     spawn_robot = Node(
         package='ros_gz_sim',
         executable='create',
         arguments=[
             '-name', 'robotic_horse',
             '-topic', 'robot_description',
-            '-x', '0.0', '-y', '0.0', '-z', '1.02',
+            '-x', '0.0', '-y', '0.0', '-z', '0.77',
         ],
         output='screen',
     )
