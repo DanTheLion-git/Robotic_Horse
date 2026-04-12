@@ -64,24 +64,24 @@ NEUTRAL_CANNON_REAR  = -0.366   # CANNON_LEAN - (-0.516 + 1.031)
 # ── Elk gait parameters ───────────────────────────────────────────────────────
 WALK = dict(
     phase_offsets={'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
-    swing_frac=0.35,
-    step_height=0.20,   # scaled for 1.45m elk: ~20cm lift at walk
+    swing_frac=0.22,
+    step_height=0.06,   # small, grounded steps like a real elk walk
     period=1.6,
     name='WALK',
 )
 
 TROT = dict(
     phase_offsets={'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0},
-    swing_frac=0.50,
-    step_height=0.30,   # elk trot: energetic, ~30cm lift
+    swing_frac=0.32,
+    step_height=0.12,   # moderate lift at trot
     period=0.90,
     name='TROT',
 )
 
 GALLOP = dict(
     phase_offsets={'fl': 0.0, 'rl': 0.15, 'fr': 0.50, 'rr': 0.65},
-    swing_frac=0.55,
-    step_height=0.40,   # elk gallop: large bounding strides
+    swing_frac=0.42,
+    step_height=0.22,   # larger bounding strides at gallop
     period=0.50,
     name='GALLOP',
 )
@@ -200,7 +200,7 @@ def _foot_target_3d(leg: str, phase: float, linear_v: float, angular_v: float,
         p  = (local - gait['swing_frac']) / (1.0 - gait['swing_frac'])
         fx = fx_mean * (1.0 - 2.0 * p)
         fy = fy_mean * (1.0 - 2.0 * p)
-        fz = -ankle_height
+        fz = -(ankle_height + 0.02)   # press 2cm into ground for firm contact
         return fx, fy, fz
 
 

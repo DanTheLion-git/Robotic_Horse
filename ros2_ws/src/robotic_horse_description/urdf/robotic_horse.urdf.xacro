@@ -242,8 +242,8 @@
     <child link="horse_collar_link"/>
     <origin xyz="3.40 0 1.05" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-0.35" upper="0.35" effort="2000" velocity="1.0"/>
-    <dynamics damping="15.0" friction="3.0"/>
+    <limit lower="-0.15" upper="0.15" effort="3000" velocity="0.5"/>
+    <dynamics damping="40.0" friction="10.0"/>
   </joint>
 
   <!-- Collar link: massless pivot point where shaft meets horse.
@@ -265,11 +265,12 @@
   <!-- ═══════════════════════════════════════════════════════
        BASE LINK
   ═══════════════════════════════════════════════════════ -->
-  <!-- Elk animatronic body: 45kg (frame 18kg + motors 15kg + costume 12kg) -->
+  <!-- Elk animatronic body: 45kg (frame 18kg + motors 15kg + costume 12kg)
+       CoM shifted -0.15m rear to counterbalance neck/head forward mass. -->
   <link name="base_link">
     <inertial>
       <mass value="45.0"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="-0.15 0 0" rpy="0 0 0"/>
       <inertia ixx="1.202" iyy="4.875" izz="5.402" ixy="0" ixz="0" iyz="0"/>
     </inertial>
     <!-- Main body panel -->
@@ -300,8 +301,8 @@
   <!-- Neck: angled 45 deg forward from vertical.
        Joint origin at front-top of body (withers area). -->
   <link name="neck_link">
-    <inertial><mass value="4.0"/><origin xyz="0 0 0.275" rpy="0 0 0"/>
-      <inertia ixx="0.111" iyy="0.111" izz="0.020" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="2.5"/><origin xyz="0 0 0.275" rpy="0 0 0"/>
+      <inertia ixx="0.080" iyy="0.080" izz="0.015" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 0.275" rpy="0 0 0"/>
       <geometry><cylinder radius="0.12" length="0.55"/></geometry><material name="body_panel"/></visual>
     <collision><origin xyz="0 0 0.275" rpy="0 0 0"/>
@@ -315,8 +316,8 @@
 
   <!-- Head: skull box + snout extension -->
   <link name="head_link">
-    <inertial><mass value="2.0"/><origin xyz="0.10 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.016" iyy="0.031" izz="0.026" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="1.2"/><origin xyz="0.10 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.010" iyy="0.020" izz="0.016" ixy="0" ixz="0" iyz="0"/></inertial>
     <!-- Skull -->
     <visual><origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry><box size="0.40 0.18 0.28"/></geometry><material name="body_panel"/></visual>
