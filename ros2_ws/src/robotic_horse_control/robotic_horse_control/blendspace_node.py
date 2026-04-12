@@ -65,7 +65,7 @@ NEUTRAL_CANNON_REAR  = -0.366   # CANNON_LEAN - (-0.516 + 1.031)
 WALK = dict(
     phase_offsets={'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
     swing_frac=0.22,
-    step_height=0.06,   # small, grounded steps like a real elk walk
+    step_height=0.10,   # world-frame base clearance at walk (pitch compensation adds on top)
     period=1.6,
     name='WALK',
 )
@@ -73,7 +73,7 @@ WALK = dict(
 TROT = dict(
     phase_offsets={'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0},
     swing_frac=0.32,
-    step_height=0.12,   # moderate lift at trot
+    step_height=0.18,   # trot: moderate lift
     period=0.90,
     name='TROT',
 )
@@ -81,7 +81,7 @@ TROT = dict(
 GALLOP = dict(
     phase_offsets={'fl': 0.0, 'rl': 0.15, 'fr': 0.50, 'rr': 0.65},
     swing_frac=0.42,
-    step_height=0.22,   # larger bounding strides at gallop
+    step_height=0.28,   # gallop: full bounding stride
     period=0.50,
     name='GALLOP',
 )
@@ -161,26 +161,78 @@ def _ik_3d_rear(fx: float, fy: float, fz: float):
     return hip_z, thigh, knee, cannon
 
 
-# ── Elk swing profile ─────────────────────────────────────────────────────────
+# ── Elk swing profile  (3-phase: Lift → Carry → Plant) ───────────────────────
+#
+# Phase 0.00–0.30  LIFT   : foot rises from liftoff position
+# Phase 0.30–0.70  CARRY  : foot at peak height, sweeps forward
+# Phase 0.70–1.00  PLANT  : foot descends to target touchdown position
+#
+# This gives a clear IK-target arc so the foot definitively clears the ground
+# and lands precisely at the Raibert target — like a proper step trajectory.
+#
+# step_height is the WORLD-FRAME clearance guarantee: the pitch compensation
+# argument adds extra lift so the foot ALWAYS clears the ground even when the
+# body pitches forward.
 
 def _elk_swing(p: float, fx_mean: float, fy_mean: float,
                ankle_height: float, step_height: float):
-    lift = step_height * math.sin(math.pi * (p ** 0.7))
-    t    = p ** 1.3
-    fx   = -fx_mean + 2.0 * fx_mean * t
-    fy   = -fy_mean + 2.0 * fy_mean * t
-    fz   = -(ankle_height - lift)
+    """
+    3-phase swing arc.
+      p         : swing progress [0, 1]
+      fx_mean   : Raibert half-stride in x (foot goes from -fx_mean to +fx_mean)
+      fy_mean   : Raibert half-stride in y
+      ankle_height : neutral foot depth below hip [m]
+      step_height  : guaranteed world-frame ground clearance [m] (pitch-corrected)
+    """
+    LIFT_END  = 0.30
+    CARRY_END = 0.70
+
+    if p < LIFT_END:
+        # LIFT: foot rises from liftoff (-fx_mean) straight up
+        t_lift = p / LIFT_END            # 0→1
+        lift   = step_height * math.sin(math.pi * 0.5 * t_lift)  # 0 → step_height
+        t_fwd  = t_lift * 0.15           # subtle forward creep during lift (15% of stride)
+        fx     = -fx_mean + 2.0 * fx_mean * t_fwd
+        fy     = -fy_mean + 2.0 * fy_mean * t_fwd
+    elif p < CARRY_END:
+        # CARRY: foot at peak height, sweeps forward over the ground
+        t_carry = (p - LIFT_END) / (CARRY_END - LIFT_END)   # 0→1
+        lift    = step_height          # constant full height during carry
+        t_fwd   = 0.15 + t_carry * 0.70   # 15% → 85% of stride
+        fx      = -fx_mean + 2.0 * fx_mean * t_fwd
+        fy      = -fy_mean + 2.0 * fy_mean * t_fwd
+    else:
+        # PLANT: foot descends from peak to touchdown (+fx_mean)
+        t_plant = (p - CARRY_END) / (1.0 - CARRY_END)       # 0→1
+        lift    = step_height * math.cos(math.pi * 0.5 * t_plant)  # step_height → 0
+        t_fwd   = 0.85 + t_plant * 0.15   # 85% → 100% of stride
+        fx      = -fx_mean + 2.0 * fx_mean * t_fwd
+        fy      = -fy_mean + 2.0 * fy_mean * t_fwd
+
+    fz = -(ankle_height - lift)
     return fx, fy, fz
+
+
+def _pitch_compensated_step_height(leg: str, shaft_pitch: float,
+                                   base_step_height: float) -> float:
+    """
+    World-frame ground clearance guarantee:
+      When the body pitches forward (positive shaft_pitch), front legs
+      (lx > 0) need extra lift to clear the ground. Adds lx * sin(pitch)
+      so the foot stays above the ground plane regardless of body tilt.
+    """
+    lx = LEG_POS[leg][0]
+    extra = max(0.0, lx * math.sin(shaft_pitch))
+    return base_step_height + extra
 
 
 # ── Arc-following foot target (Raibert) ──────────────────────────────────────
 
 def _foot_target_3d(leg: str, phase: float, linear_v: float, angular_v: float,
-                    ankle_height: float, gait: dict):
+                    ankle_height: float, gait: dict, step_height: float):
     """
-    Raibert arc-following foot placement.
-    Horse base_link +x = away from cart (nose direction).
-    Positive linear_v = step forward (away from cart) = correct.
+    Raibert arc-following foot placement with 3-phase swing arc.
+    step_height is already pitch-compensated (call _pitch_compensated_step_height first).
     """
     lx, ly   = LEG_POS[leg]
     T_stance = gait['period'] * (1.0 - gait['swing_frac'])
@@ -195,7 +247,7 @@ def _foot_target_3d(leg: str, phase: float, linear_v: float, angular_v: float,
 
     if local < gait['swing_frac']:
         p = local / gait['swing_frac']
-        return _elk_swing(p, fx_mean, fy_mean, ankle_height, gait['step_height'])
+        return _elk_swing(p, fx_mean, fy_mean, ankle_height, step_height)
     else:
         p  = (local - gait['swing_frac']) / (1.0 - gait['swing_frac'])
         fx = fx_mean * (1.0 - 2.0 * p)
@@ -287,7 +339,7 @@ class BlendspaceNode(Node):
 
         gait = self._gait
 
-        # Body leveling
+        # Body leveling + pitch-compensated step heights per leg
         pitch_adj = math.tan(self._shaft_pitch) * HALF_BODY_LENGTH
         pitch_adj = max(-0.15, min(0.15, pitch_adj))
         ankle_heights = {
@@ -295,6 +347,11 @@ class BlendspaceNode(Node):
             'fr': ANKLE_HEIGHT + pitch_adj,
             'rl': ANKLE_HEIGHT - pitch_adj,
             'rr': ANKLE_HEIGHT - pitch_adj,
+        }
+        # Front legs need extra lift when body pitches forward so feet clear ground
+        step_heights = {
+            leg: _pitch_compensated_step_height(leg, self._shaft_pitch, gait['step_height'])
+            for leg in LEG_ORDER
         }
 
         # Active cart steering
@@ -315,7 +372,7 @@ class BlendspaceNode(Node):
                 ank_h  = ankle_heights[leg]
                 eff_ph = self._adjusted_phase(leg, phase, gait)
 
-                fx, fy, fz = _foot_target_3d(leg, eff_ph, lin, ang, ank_h, gait)
+                fx, fy, fz = _foot_target_3d(leg, eff_ph, lin, ang, ank_h, gait, step_heights[leg])
 
                 if leg in FRONT_LEGS:
                     hip_z, thigh, knee, cannon = _ik_3d_front(fx, fy, fz)
