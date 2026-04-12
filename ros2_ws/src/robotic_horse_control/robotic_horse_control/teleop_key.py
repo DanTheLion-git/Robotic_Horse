@@ -1,131 +1,163 @@
 """
-teleop_key.py  —  Keyboard teleop for the Robotic Horse.
-
-Publishes geometry_msgs/Twist to /cmd_vel at 10 Hz while a key is held,
-and a zero twist when released.
-Publishes std_msgs/String to /cmd_gait on gait toggle.
+teleop_key.py  —  Smooth velocity-ramp keyboard controller.
 
 Controls:
-    W  — forward
-    S  — backward
-    A  — turn left
-    D  — turn right
-    SPACE — stop immediately
-    Q — toggle gait (trot / gallop)
-    Ctrl-C — quit
+  W       — accelerate forward  (speed ramps up while held)
+  S       — decelerate          (speed ramps down to 0 while held)
+  A       — turn left            (turn rate ramps up while held)
+  D       — turn right           (turn rate ramps up while held)
+  SPACE   — smooth stop          (both speed AND turn lerp to 0 over 3 s)
+  Q       — quit
 
-Run in a SEPARATE terminal after starting the simulation:
-    ros2 run robotic_horse_control teleop_key
+Speed-gait auto-switching happens in blendspace_node based on speed:
+  0 – 1.5 m/s  → WALK
+  1.5 – 3.5 m/s → TROT
+  > 3.5 m/s    → GALLOP
+
+The robot cannot move backward (speed clamped at 0).
 """
 
 import sys
+import os
+import time
 import select
 import tty
 import termios
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from std_msgs.msg import String
 
 
-SPEED   = 0.5   # linear.x for forward / backward
-TURNING = 0.8   # angular.z for left / right
+# ── Tuning ────────────────────────────────────────────────────────────────────
+MAX_SPEED     = 5.0   # m/s
+MAX_TURN      = 2.0   # rad/s
 
-BANNER = """
-╔══════════════════════════════════════╗
-║    Robotic Horse Keyboard Teleop     ║
-╠══════════════════════════════════════╣
-║  W — Forward      S — Backward       ║
-║  A — Turn Left    D — Turn Right     ║
-║  Q — Cycle Gait: Walk→Trot→Gallop    ║
-║  SPACE — Stop     Ctrl-C — Quit      ║
-╚══════════════════════════════════════╝
+ACCEL         = 0.4   # m/s² forward acceleration per second
+DECEL         = 0.6   # m/s² deceleration per second (S key)
+TURN_ACCEL    = 0.8   # rad/s² turn acceleration
+TURN_DECAY    = 1.2   # rad/s² turn decay when neither A nor D held
+
+BRAKE_TIME    = 3.0   # seconds for SPACE to bring to full stop
+PUBLISH_HZ    = 25    # cmd_vel publish rate
+
+
+HELP = """
+ Elk Animatronic Keyboard Teleop
+ ────────────────────────────────
+  W   = accelerate forward
+  S   = brake / decelerate
+  A   = turn left
+  D   = turn right
+  SPC = smooth stop (3 seconds)
+  Q   = quit
+
+  Speed auto-selects gait:
+    0–1.5 m/s  → WALK
+    1.5–3.5 m/s → TROT
+    >3.5 m/s   → GALLOP
 """
 
 
-def _get_key(timeout: float = 0.1) -> str:
-    """Read one character with timeout; return '' if none available."""
-    fd = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        rlist, _, _ = select.select([sys.stdin], [], [], timeout)
-        if rlist:
-            return sys.stdin.read(1)
-        return ''
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+def get_key_nonblocking():
+    """Read one keypress without blocking. Returns '' if no key available."""
+    if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+        ch = sys.stdin.read(1)
+        if ch == '\x1b':  # escape sequence (arrow keys)
+            rest = sys.stdin.read(2) if sys.stdin in select.select([sys.stdin], [], [], 0.01)[0] else ''
+            return ch + rest
+        return ch
+    return ''
 
 
-class TeleopKey(Node):
-
-    GAIT_SEQUENCE = ['trot', 'gallop', 'walk']   # cycle starting from trot
+class TeleopNode(Node):
 
     def __init__(self):
         super().__init__('teleop_key')
-        self._pub      = self.create_publisher(Twist,  '/cmd_vel',  10)
-        self._gait_pub = self.create_publisher(String, '/cmd_gait', 10)
-        self._gait_idx = 0   # start at trot (index 0 in GAIT_SEQUENCE)
+        self._pub = self.create_publisher(Twist, '/cmd_vel', 10)
 
-    def _toggle_gait(self):
-        self._gait_idx = (self._gait_idx + 1) % len(self.GAIT_SEQUENCE)
-        mode = self.GAIT_SEQUENCE[self._gait_idx]
-        msg = String()
-        msg.data = mode
-        self._gait_pub.publish(msg)
-        print(f'\r  Gait -> {mode.upper():<10}', end='', flush=True)
+        self._speed = 0.0
+        self._turn  = 0.0
 
-    def run(self):
-        print(BANNER)
-        prev_key = ''
-        try:
-            while rclpy.ok():
-                key = _get_key(timeout=0.1)
+        self._braking    = False
+        self._brake_rate = 0.0   # set when SPACE pressed
 
-                if key == '\x03':   # Ctrl-C
-                    break
+        self._last_t = time.monotonic()
 
-                msg = Twist()
-                if key in ('w', 'W'):
-                    msg.linear.x  = SPEED
-                elif key in ('s', 'S'):
-                    msg.linear.x  = -SPEED
-                elif key in ('a', 'A'):
-                    msg.angular.z = TURNING
-                elif key in ('d', 'D'):
-                    msg.angular.z = -TURNING
-                elif key in ('q', 'Q'):
-                    self._toggle_gait()
-                    prev_key = key
-                    continue
-                elif key == ' ':
-                    pass   # zero twist = stop
-                elif key == '':
-                    # No key pressed — stop (don't keep last command)
-                    if prev_key not in ('', ' '):
-                        self._pub.publish(Twist())
-                    prev_key = key
-                    continue
-                else:
-                    prev_key = key
-                    continue
+        self._timer = self.create_timer(1.0 / PUBLISH_HZ, self._tick)
 
-                self._pub.publish(msg)
-                prev_key = key
+        self.get_logger().info(HELP)
 
-        except Exception as exc:
-            print(f'\nTeleop error: {exc}')
-        finally:
-            self._pub.publish(Twist())   # send stop on exit
-            print('\nTeleop stopped.')
+    def _tick(self):
+        now = time.monotonic()
+        dt  = now - self._last_t
+        self._last_t = now
+
+        key = get_key_nonblocking()
+
+        if key in ('q', 'Q', '\x03'):
+            self.get_logger().info('Quit.')
+            rclpy.shutdown()
+            return
+
+        if key == ' ':
+            # Space: initiate smooth stop over BRAKE_TIME seconds
+            self._braking    = True
+            speed_rate = self._speed / BRAKE_TIME if self._speed > 0 else 0.0
+            turn_rate  = abs(self._turn) / BRAKE_TIME if abs(self._turn) > 0 else 0.0
+            self._brake_speed_rate = speed_rate
+            self._brake_turn_rate  = turn_rate
+
+        # ── Update speed ──────────────────────────────────────────────────
+        if self._braking:
+            # Lerp both to zero at constant rate
+            self._speed = max(0.0, self._speed - self._brake_speed_rate * dt)
+            if self._turn > 0:
+                self._turn = max(0.0, self._turn - self._brake_turn_rate * dt)
+            else:
+                self._turn = min(0.0, self._turn + self._brake_turn_rate * dt)
+            if self._speed <= 0.001 and abs(self._turn) <= 0.001:
+                self._speed   = 0.0
+                self._turn    = 0.0
+                self._braking = False
+        else:
+            if key == 'w' or key == 'W':
+                self._speed = min(MAX_SPEED, self._speed + ACCEL * dt)
+                self._braking = False
+            elif key == 's' or key == 'S':
+                self._speed = max(0.0, self._speed - DECEL * dt)
+
+            # Turn: ramp toward target while key held, decay otherwise
+            if key == 'a' or key == 'A':
+                self._turn = min(MAX_TURN, self._turn + TURN_ACCEL * dt)
+                self._braking = False
+            elif key == 'd' or key == 'D':
+                self._turn = max(-MAX_TURN, self._turn - TURN_ACCEL * dt)
+                self._braking = False
+            else:
+                # Natural turn decay (like releasing a steering wheel)
+                if self._turn > 0:
+                    self._turn = max(0.0, self._turn - TURN_DECAY * dt)
+                elif self._turn < 0:
+                    self._turn = min(0.0, self._turn + TURN_DECAY * dt)
+
+        # ── Publish ───────────────────────────────────────────────────────
+        msg = Twist()
+        msg.linear.x  = self._speed
+        msg.angular.z = self._turn
+        self._pub.publish(msg)
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = TeleopKey()
+
+    old_settings = termios.tcgetattr(sys.stdin)
     try:
-        node.run()
+        tty.setraw(sys.stdin.fileno())
+        node = TeleopNode()
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+        print('\nTeleop stopped.')

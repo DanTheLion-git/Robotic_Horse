@@ -1,7 +1,7 @@
 # ros2_control.yaml
 # ──────────────────
 # Configuration for the controller_manager and the joint controllers.
-# PID gains tuned for elk animatronic mass (~62 kg total, 3-segment deer legs).
+# PID gains tuned for red deer elk animatronic (~105 kg total: 45 kg body + 4x scaled limbs).
 #
 #   joint_state_broadcaster  — reads all joint positions/velocities
 #   leg_controller           — JointTrajectoryController (17 joints)
@@ -45,22 +45,22 @@ leg_controller:
       - position
       - velocity
 
-    # PID gains — scaled for 62 kg elk animatronic
+    # PID gains — scaled for ~105 kg total red deer elk (45 kg body, scaled limbs)
     gains:
-      cart_to_shaft_steer: { p: 1200.0, i: 0.0, d: 100.0 }
-      fl_hip_joint:     { p: 250.0, i: 0.0, d:  15.0 }
-      fl_thigh_joint:   { p: 500.0, i: 0.0, d:  30.0 }
-      fl_knee_joint:    { p: 800.0, i: 0.0, d:  50.0 }
-      fl_cannon_joint:  { p: 400.0, i: 0.0, d:  20.0 }
-      fr_hip_joint:     { p: 250.0, i: 0.0, d:  15.0 }
-      fr_thigh_joint:   { p: 500.0, i: 0.0, d:  30.0 }
-      fr_knee_joint:    { p: 800.0, i: 0.0, d:  50.0 }
-      fr_cannon_joint:  { p: 400.0, i: 0.0, d:  20.0 }
-      rl_hip_joint:     { p: 250.0, i: 0.0, d:  15.0 }
-      rl_thigh_joint:   { p: 500.0, i: 0.0, d:  30.0 }
-      rl_knee_joint:    { p: 800.0, i: 0.0, d:  50.0 }
-      rl_cannon_joint:  { p: 400.0, i: 0.0, d:  20.0 }
-      rr_hip_joint:     { p: 250.0, i: 0.0, d:  15.0 }
-      rr_thigh_joint:   { p: 500.0, i: 0.0, d:  30.0 }
-      rr_knee_joint:    { p: 800.0, i: 0.0, d:  50.0 }
-      rr_cannon_joint:  { p: 400.0, i: 0.0, d:  20.0 }
+      cart_to_shaft_steer: { p: 2000.0, i: 0.0, d: 170.0 }
+      fl_hip_joint:     { p: 450.0, i: 0.0, d:  25.0 }
+      fl_thigh_joint:   { p: 850.0, i: 0.0, d:  50.0 }
+      fl_knee_joint:    { p: 1400.0, i: 0.0, d:  80.0 }
+      fl_cannon_joint:  { p: 700.0, i: 0.0, d:  35.0 }
+      fr_hip_joint:     { p: 450.0, i: 0.0, d:  25.0 }
+      fr_thigh_joint:   { p: 850.0, i: 0.0, d:  50.0 }
+      fr_knee_joint:    { p: 1400.0, i: 0.0, d:  80.0 }
+      fr_cannon_joint:  { p: 700.0, i: 0.0, d:  35.0 }
+      rl_hip_joint:     { p: 450.0, i: 0.0, d:  25.0 }
+      rl_thigh_joint:   { p: 850.0, i: 0.0, d:  50.0 }
+      rl_knee_joint:    { p: 1400.0, i: 0.0, d:  80.0 }
+      rl_cannon_joint:  { p: 700.0, i: 0.0, d:  35.0 }
+      rr_hip_joint:     { p: 450.0, i: 0.0, d:  25.0 }
+      rr_thigh_joint:   { p: 850.0, i: 0.0, d:  50.0 }
+      rr_knee_joint:    { p: 1400.0, i: 0.0, d:  80.0 }
+      rr_cannon_joint:  { p: 700.0, i: 0.0, d:  35.0 }
