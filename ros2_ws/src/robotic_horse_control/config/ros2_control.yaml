@@ -14,22 +14,21 @@ controller_manager:
   ros__parameters:
     update_rate: 100  # Hz — how often the controller loop runs
 
-    joint_state_broadcaster:
-      type: joint_state_broadcaster/JointStateBroadcaster
-
-    leg_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
-
 # ── Leg trajectory controller ──────────────────────────────────────
 leg_controller:
   ros__parameters:
     joints:
+      - cart_to_shaft_steer
+      - fl_hip_joint
       - fl_thigh_joint
       - fl_knee_joint
+      - fr_hip_joint
       - fr_thigh_joint
       - fr_knee_joint
+      - rl_hip_joint
       - rl_thigh_joint
       - rl_knee_joint
+      - rr_hip_joint
       - rr_thigh_joint
       - rr_knee_joint
 
@@ -43,11 +42,16 @@ leg_controller:
     # PID gains for each joint (position → effort)
     # Tune these once the simulation is running; start conservative.
     gains:
+      cart_to_shaft_steer: { p: 800.0,  i: 0.0, d: 80.0  }
+      fl_hip_joint:   { p: 100.0, i: 0.0, d: 5.0  }
       fl_thigh_joint: { p: 200.0, i: 0.0, d: 10.0 }
       fl_knee_joint:  { p: 400.0, i: 0.0, d: 20.0 }
+      fr_hip_joint:   { p: 100.0, i: 0.0, d: 5.0  }
       fr_thigh_joint: { p: 200.0, i: 0.0, d: 10.0 }
       fr_knee_joint:  { p: 400.0, i: 0.0, d: 20.0 }
+      rl_hip_joint:   { p: 100.0, i: 0.0, d: 5.0  }
       rl_thigh_joint: { p: 200.0, i: 0.0, d: 10.0 }
       rl_knee_joint:  { p: 400.0, i: 0.0, d: 20.0 }
+      rr_hip_joint:   { p: 100.0, i: 0.0, d: 5.0  }
       rr_thigh_joint: { p: 200.0, i: 0.0, d: 10.0 }
       rr_knee_joint:  { p: 400.0, i: 0.0, d: 20.0 }

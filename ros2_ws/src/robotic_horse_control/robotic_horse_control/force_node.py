@@ -19,6 +19,8 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
+from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Point
 
 
 # ── Physical constants (mirrors force_calculator.py) ───────────────────────
@@ -75,6 +77,34 @@ LEG_JOINTS = {
     'rr': ('rr_thigh_joint', 'rr_knee_joint'),
 }
 
+# Hip socket position in base_link frame (hip_link origin + 0.08 down)
+HIP_SOCKET = {
+    'fl': ( 0.35,  0.18, -0.13),
+    'fr': ( 0.35, -0.18, -0.13),
+    'rl': (-0.35,  0.18, -0.13),
+    'rr': (-0.35, -0.18, -0.13),
+}
+
+FORCE_MAX = 1500.0   # N – maps to full red / max arrow length
+ARROW_SCALE = 1.0 / FORCE_MAX   # 1500 N → 1.0 m arrow
+
+
+def _force_color(force_n: float):
+    """Return (r, g, b) on a green→yellow→red gradient for 0..FORCE_MAX."""
+    t = max(0.0, min(1.0, force_n / FORCE_MAX))
+    r = min(1.0, 2.0 * t)
+    g = min(1.0, 2.0 * (1.0 - t))
+    return r, g, 0.0
+
+
+def _knee_pos(leg: str, th: float) -> tuple:
+    """Knee position in base_link frame given hip socket and thigh angle."""
+    sx, sy, sz = HIP_SOCKET[leg]
+    kx = sx + L1 * math.sin(th)
+    ky = sy
+    kz = sz - L1 * math.cos(th)
+    return kx, ky, kz
+
 
 class ForceNode(Node):
     def __init__(self):
@@ -88,6 +118,9 @@ class ForceNode(Node):
         )
         self._pub_torque = self.create_publisher(
             Float32MultiArray, '/robotic_horse/motor_torques', 10
+        )
+        self._pub_markers = self.create_publisher(
+            MarkerArray, '/robotic_horse/force_markers', 10
         )
         self._joint_pos: dict[str, float] = {}
         self.get_logger().info('Force node started — monitoring ballscrew forces.')
@@ -109,6 +142,60 @@ class ForceNode(Node):
 
         self._pub_force.publish(self._make_msg(forces))
         self._pub_torque.publish(self._make_msg(torques))
+        self._pub_markers.publish(
+            self._make_markers(list(zip(('fl', 'fr', 'rl', 'rr'), forces)))
+        )
+
+    def _make_markers(self, leg_forces: list) -> MarkerArray:
+        arr = MarkerArray()
+        now = self.get_clock().now().to_msg()
+        for i, (leg, force) in enumerate(leg_forces):
+            th  = self._joint_pos.get(LEG_JOINTS[leg][0], 0.0)
+            kx, ky, kz = _knee_pos(leg, th)
+            r, g, b = _force_color(force)
+            arrow_len = force * ARROW_SCALE
+
+            # Arrow marker: points downward from knee, length ∝ force
+            arrow = Marker()
+            arrow.header.frame_id = 'base_link'
+            arrow.header.stamp    = now
+            arrow.ns              = 'ballscrew_forces'
+            arrow.id              = i
+            arrow.type            = Marker.ARROW
+            arrow.action          = Marker.ADD
+            arrow.scale.x = 0.015   # shaft diameter
+            arrow.scale.y = 0.03    # head diameter
+            arrow.scale.z = 0.06    # head length
+            arrow.color.r = r
+            arrow.color.g = g
+            arrow.color.b = b
+            arrow.color.a = 0.9
+            start = Point(x=kx, y=ky, z=kz)
+            end   = Point(x=kx, y=ky, z=kz - arrow_len)
+            arrow.points = [start, end]
+            arr.markers.append(arrow)
+
+            # Text label above the knee
+            label = Marker()
+            label.header.frame_id = 'base_link'
+            label.header.stamp    = now
+            label.ns              = 'ballscrew_labels'
+            label.id              = i + 10
+            label.type            = Marker.TEXT_VIEW_FACING
+            label.action          = Marker.ADD
+            label.pose.position.x = kx
+            label.pose.position.y = ky
+            label.pose.position.z = kz + 0.08
+            label.pose.orientation.w = 1.0
+            label.scale.z         = 0.07
+            label.color.r         = r
+            label.color.g         = g
+            label.color.b         = b
+            label.color.a         = 1.0
+            label.text            = f'{leg.upper()}: {force:.0f} N'
+            arr.markers.append(label)
+
+        return arr
 
     @staticmethod
     def _make_msg(values: list) -> Float32MultiArray:
@@ -131,4 +218,5 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()

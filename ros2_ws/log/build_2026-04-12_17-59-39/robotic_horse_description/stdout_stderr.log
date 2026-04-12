@@ -1,0 +1,26 @@
+-- Found ament_cmake: 2.5.4 (/opt/ros/jazzy/share/ament_cmake/cmake)
+-- Override CMake install command with custom implementation using symlinks instead of copying resources
+-- Configuring done (0.2s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_description
+-- Install configuration: ""
+-- Execute custom install script
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/urdf/robotic_horse.urdf
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/urdf/robotic_horse.urdf.xacro
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/launch/display.launch.py
+-- Symlinking: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/rviz/robotic_horse.rviz
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/ament_index/resource_index/package_run_dependencies/robotic_horse_description
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/ament_index/resource_index/parent_prefix_path/robotic_horse_description
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/environment/ament_prefix_path.sh
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/environment/ament_prefix_path.dsv
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/environment/path.sh
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/environment/path.dsv
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/local_setup.bash
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/local_setup.sh
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/local_setup.zsh
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/local_setup.dsv
+-- Symlinking: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/package.dsv
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/ament_index/resource_index/packages/robotic_horse_description
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/cmake/robotic_horse_descriptionConfig.cmake
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/cmake/robotic_horse_descriptionConfig-version.cmake
+-- Up-to-date symlink: /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description/share/robotic_horse_description/package.xml

@@ -1,0 +1,728 @@
+<?xml version="1.0"?>
+<!--
+  Robotic Horse — Gazebo / ROS2 URDF
+  ===================================
+  This is the Gazebo-compatible version of the robot description.
+  It extends the base URDF with:
+    • <ros2_control> hardware interface tags  (8 controlled joints)
+    • <gazebo> plugin tag  (loads gazebo_ros2_control)
+    • <gazebo> material + contact tags per link
+
+  Leg layout (top view):
+      FL –––– FR
+      |        |
+      RL –––– RR
+
+  Controlled joints (8 total):
+      {fl,fr,rl,rr}_thigh_joint  — hip flexion/extension  (position ctrl)
+      {fl,fr,rl,rr}_knee_joint   — knee driven by ballscrew (position ctrl)
+
+  Fixed joints (set at 0, no actuator needed for cart-supported robot):
+      {fl,fr,rl,rr}_hip_joint    — lateral hip bracket
+
+  Physical parameters (edit here and in ros2_control.yaml):
+    Body mass  : 20 kg
+    Thigh      : 0.45 m,  1.5 kg
+    Shank      : 0.50 m,  1.0 kg
+    Foot sphere: r=0.04 m, 0.2 kg
+-->
+<robot name="robotic_horse" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ═══════════════════════════════════════════════════════
+       MATERIALS
+  ═══════════════════════════════════════════════════════ -->
+  <material name="dark_grey">  <color rgba="0.20 0.20 0.20 1"/></material>
+  <material name="orange">     <color rgba="0.90 0.40 0.00 1"/></material>
+  <material name="light_grey"> <color rgba="0.70 0.70 0.70 1"/></material>
+  <material name="black">      <color rgba="0.05 0.05 0.05 1"/></material>
+  <material name="silver">     <color rgba="0.75 0.75 0.80 1"/></material>
+  <material name="body_panel"> <color rgba="0.25 0.25 0.30 1"/></material>
+  <material name="wood">       <color rgba="0.55 0.35 0.15 1"/></material>
+  <material name="iron">       <color rgba="0.28 0.28 0.28 1"/></material>
+
+  <!-- ═══════════════════════════════════════════════════════
+       WAGON ASSEMBLY
+       cart_base is the physics root spawned at (-2.50, 0, 0.55).
+       Front wheels steer via cart_to_shaft_steer revolute-Z joint.
+       Shaft poles slope up from front axle to horse collar.
+       shaft_to_horse is revolute-Y so horse can pitch on hills.
+
+       World-frame positions (spawn: x=-2.50, z=0.55):
+         Cart centre    : (-2.50,  0,  0.55)
+         Front axle     : (-1.80,  0,  0.35)  xyz="0.70 0 -0.20" in cart
+         Horse base_link: ( 0.30,  0,  1.00)  xyz="2.10 0 0.65" in shaft_steer
+  ═══════════════════════════════════════════════════════ -->
+
+  <!-- ── WAGON BODY (root link) ─────────────────────────────── -->
+  <link name="cart_base">
+    <inertial>
+      <mass value="120.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="11.6" iyy="21.2" izz="29.6" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <!-- Main wagon box -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="1.40 1.00 0.40"/></geometry>
+      <material name="wood"/>
+    </visual>
+    <!-- Front footboard -->
+    <visual>
+      <origin xyz="0.73 0 0.25" rpy="0 0 0"/>
+      <geometry><box size="0.06 1.00 0.10"/></geometry>
+      <material name="iron"/>
+    </visual>
+    <!-- Rear board -->
+    <visual>
+      <origin xyz="-0.73 0 0.25" rpy="0 0 0"/>
+      <geometry><box size="0.06 1.00 0.10"/></geometry>
+      <material name="iron"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="1.40 1.00 0.40"/></geometry>
+    </collision>
+  </link>
+  <gazebo reference="cart_base"><material>Gazebo/DarkGrey</material></gazebo>
+
+  <!-- ── REAR-LEFT WHEEL ────────────────────────────────── -->
+  <link name="cart_wheel_rl">
+    <inertial><mass value="5.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.157" iyy="0.306" izz="0.157" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.35" length="0.10"/></geometry>
+      <material name="dark_grey"/>
+    </visual>
+    <collision><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.35" length="0.10"/></geometry>
+    </collision>
+  </link>
+  <joint name="cart_to_wheel_rl" type="continuous">
+    <parent link="cart_base"/><child link="cart_wheel_rl"/>
+    <origin xyz="-0.50  0.55 -0.20" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <dynamics damping="2.0" friction="1.0"/>
+  </joint>
+  <gazebo reference="cart_wheel_rl">
+    <material>Gazebo/FlatBlack</material>
+    <kp>500000.0</kp><kd>50.0</kd><mu1>0.9</mu1><mu2>0.9</mu2>
+  </gazebo>
+
+  <!-- ── REAR-RIGHT WHEEL ───────────────────────────────── -->
+  <link name="cart_wheel_rr">
+    <inertial><mass value="5.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.157" iyy="0.306" izz="0.157" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.35" length="0.10"/></geometry>
+      <material name="dark_grey"/>
+    </visual>
+    <collision><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.35" length="0.10"/></geometry>
+    </collision>
+  </link>
+  <joint name="cart_to_wheel_rr" type="continuous">
+    <parent link="cart_base"/><child link="cart_wheel_rr"/>
+    <origin xyz="-0.50 -0.55 -0.20" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <dynamics damping="2.0" friction="1.0"/>
+  </joint>
+  <gazebo reference="cart_wheel_rr">
+    <material>Gazebo/FlatBlack</material>
+    <kp>500000.0</kp><kd>50.0</kd><mu1>0.9</mu1><mu2>0.9</mu2>
+  </gazebo>
+
+  <!-- ── STEERING JOINT (cart yaw -> front wheels + shaft turn together) ── -->
+  <!-- Revolute-Z at front axle position in cart_base frame.
+       Limits +-35 deg lets cart navigate corners without jackknifing. -->
+  <joint name="cart_to_shaft_steer" type="revolute">
+    <parent link="cart_base"/><child link="shaft_steer_link"/>
+    <origin xyz="0.70 0 -0.20" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.61" upper="0.61" effort="5000" velocity="1.0"/>
+    <dynamics damping="10.0" friction="2.0"/>
+  </joint>
+
+  <!-- ── SHAFT + FRONT WHEELS ──────────────────────────────── -->
+  <!-- Origin = front axle centre.  Poles run from (0,+/-0.25,0)
+       up to horse collar at (2.10,+/-0.25,0.65), pitch=17 deg (0.299 rad). -->
+  <link name="shaft_steer_link">
+    <inertial>
+      <mass value="6.0"/>
+      <origin xyz="1.05 0 0.325" rpy="0 0 0"/>
+      <inertia ixx="0.20" iyy="2.50" izz="2.50" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <!-- Left shaft pole -->
+    <visual>
+      <origin xyz="1.05 0.25 0.325" rpy="0 -0.299 0"/>
+      <geometry><box size="2.20 0.07 0.07"/></geometry>
+      <material name="wood"/>
+    </visual>
+    <!-- Right shaft pole -->
+    <visual>
+      <origin xyz="1.05 -0.25 0.325" rpy="0 -0.299 0"/>
+      <geometry><box size="2.20 0.07 0.07"/></geometry>
+      <material name="wood"/>
+    </visual>
+    <!-- Front axle crossbar at cart end -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.10 0.62 0.10"/></geometry>
+      <material name="iron"/>
+    </visual>
+    <!-- Horse collar yoke at shaft tip -->
+    <visual>
+      <origin xyz="2.10 0 0.65" rpy="0 0 0"/>
+      <geometry><box size="0.10 0.62 0.10"/></geometry>
+      <material name="iron"/>
+    </visual>
+    <!-- Front axle cylinder (visual only) -->
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.04" length="1.20"/></geometry>
+      <material name="iron"/>
+    </visual>
+  </link>
+  <gazebo reference="shaft_steer_link"><material>Gazebo/Grey</material></gazebo>
+
+  <!-- ── FRONT-LEFT WHEEL ───────────────────────────────── -->
+  <link name="cart_wheel_fl">
+    <inertial><mass value="5.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.157" iyy="0.306" izz="0.157" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.35" length="0.10"/></geometry>
+      <material name="dark_grey"/>
+    </visual>
+    <collision><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.35" length="0.10"/></geometry>
+    </collision>
+  </link>
+  <joint name="shaft_to_wheel_fl" type="continuous">
+    <parent link="shaft_steer_link"/><child link="cart_wheel_fl"/>
+    <origin xyz="0  0.55 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <dynamics damping="2.0" friction="1.0"/>
+  </joint>
+  <gazebo reference="cart_wheel_fl">
+    <material>Gazebo/FlatBlack</material>
+    <kp>500000.0</kp><kd>50.0</kd><mu1>0.9</mu1><mu2>0.9</mu2>
+  </gazebo>
+
+  <!-- ── FRONT-RIGHT WHEEL ──────────────────────────────── -->
+  <link name="cart_wheel_fr">
+    <inertial><mass value="5.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.157" iyy="0.306" izz="0.157" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.35" length="0.10"/></geometry>
+      <material name="dark_grey"/>
+    </visual>
+    <collision><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.35" length="0.10"/></geometry>
+    </collision>
+  </link>
+  <joint name="shaft_to_wheel_fr" type="continuous">
+    <parent link="shaft_steer_link"/><child link="cart_wheel_fr"/>
+    <origin xyz="0 -0.55 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <dynamics damping="2.0" friction="1.0"/>
+  </joint>
+  <gazebo reference="cart_wheel_fr">
+    <material>Gazebo/FlatBlack</material>
+    <kp>500000.0</kp><kd>50.0</kd><mu1>0.9</mu1><mu2>0.9</mu2>
+  </gazebo>
+
+  <!-- ── HORSE PITCH JOINT ──────────────────────────────── -->
+  <!-- Revolute-Y: horse can pitch +/-15 deg on hills.
+       Damping prevents oscillation at the collar. -->
+  <joint name="shaft_to_horse" type="revolute">
+    <parent link="shaft_steer_link"/>
+    <child link="base_link"/>
+    <origin xyz="2.10 0 0.65" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.26" upper="0.26" effort="2000" velocity="1.0"/>
+    <dynamics damping="20.0" friction="5.0"/>
+  </joint>
+
+  <!-- ═══════════════════════════════════════════════════════
+       BASE LINK
+  ═══════════════════════════════════════════════════════ -->
+  <link name="base_link">
+    <inertial>
+      <mass value="20.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.138" iyy="1.075" izz="1.140" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <!-- Main body panel -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.80 0.36 0.16"/></geometry>
+      <material name="body_panel"/>
+    </visual>
+    <!-- Top saddle plate -->
+    <visual>
+      <origin xyz="-0.04 0 0.095" rpy="0 0 0"/>
+      <geometry><box size="0.50 0.24 0.03"/></geometry>
+      <material name="silver"/>
+    </visual>
+    <!-- Front neck stub -->
+    <visual>
+      <origin xyz="0.42 0 0.06" rpy="0 0 0"/>
+      <geometry><box size="0.12 0.12 0.22"/></geometry>
+      <material name="body_panel"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.80 0.40 0.16"/></geometry>
+    </collision>
+  </link>
+  <gazebo reference="base_link">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+
+  <!-- ═══════════════════════════════════════════════════════
+       LEG LINKS & JOINTS  (macro-expanded for FL/FR/RL/RR)
+  ═══════════════════════════════════════════════════════ -->
+
+  <!-- ── FRONT-LEFT ── -->
+  <link name="fl_hip_link">
+    <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.05" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.04" length="0.10"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.04" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.03" length="0.08"/></geometry></collision>
+  </link>
+  <joint name="fl_hip_joint" type="revolute">
+    <parent link="base_link"/><child link="fl_hip_link"/>
+    <origin xyz="0.35 0.18 -0.05" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+  <gazebo reference="fl_hip_link"><material>Gazebo/Grey</material></gazebo>
+
+  <link name="fl_thigh_link">
+    <inertial><mass value="1.5"/><origin xyz="0 0 -0.225" rpy="0 0 0"/>
+      <inertia ixx="0.025" iyy="0.025" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.225" rpy="0 0 0"/>
+      <geometry><box size="0.04 0.04 0.45"/></geometry><material name="orange"/></visual>
+    <!-- Ballscrew actuator tube -->
+    <visual><origin xyz="0.025 0 -0.28" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.015" length="0.32"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.225" rpy="0 0 0">
+      </origin><geometry><box size="0.04 0.04 0.45"/></geometry></collision>
+  </link>
+  <joint name="fl_thigh_joint" type="revolute">
+    <parent link="fl_hip_link"/><child link="fl_thigh_link"/>
+    <origin xyz="0 0 -0.08" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-1.2" upper="0.5" effort="500" velocity="3.0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+  <gazebo reference="fl_thigh_link"><material>Gazebo/Orange</material></gazebo>
+
+  <link name="fl_shank_link">
+    <inertial><mass value="1.0"/><origin xyz="0 0 -0.25" rpy="0 0 0"/>
+      <inertia ixx="0.021" iyy="0.021" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.25" rpy="0 0 0">
+      </origin><geometry><box size="0.035 0.035 0.50"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 -0.25" rpy="0 0 0">
+      </origin><geometry><box size="0.03 0.03 0.50"/></geometry></collision>
+  </link>
+  <joint name="fl_knee_joint" type="revolute">
+    <parent link="fl_thigh_link"/><child link="fl_shank_link"/>
+    <origin xyz="0 0 -0.45" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-0.1" upper="2.0" effort="800" velocity="5.0"/>
+    <dynamics damping="0.8" friction="0.1"/>
+  </joint>
+  <gazebo reference="fl_shank_link"><material>Gazebo/DarkGrey</material></gazebo>
+
+  <link name="fl_foot_link">
+    <inertial><mass value="0.2"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0001" iyy="0.0001" izz="0.0001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.04"/></geometry><material name="black"/></visual>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.04"/></geometry></collision>
+  </link>
+  <joint name="fl_foot_joint" type="fixed">
+    <parent link="fl_shank_link"/><child link="fl_foot_link"/>
+    <origin xyz="0 0 -0.50" rpy="0 0 0"/>
+  </joint>
+  <gazebo reference="fl_foot_link">
+    <material>Gazebo/FlatBlack</material>
+    <kp>1000000.0</kp><kd>100.0</kd>
+    <mu1>0.8</mu1><mu2>0.8</mu2>
+  </gazebo>
+
+  <!-- ── FRONT-RIGHT ── -->
+  <link name="fr_hip_link">
+    <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.05" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.04" length="0.10"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.04" rpy="0 0 0">
+      </origin><geometry><cylinder radius="0.03" length="0.08"/></geometry></collision>
+  </link>
+  <joint name="fr_hip_joint" type="revolute">
+    <parent link="base_link"/><child link="fr_hip_link"/>
+    <origin xyz="0.35 -0.18 -0.05" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+  <gazebo reference="fr_hip_link"><material>Gazebo/Grey</material></gazebo>
+  <link name="fr_thigh_link">
+    <inertial><mass value="1.5"/><origin xyz="0 0 -0.225" rpy="0 0 0"/>
+      <inertia ixx="0.025" iyy="0.025" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.225" rpy="0 0 0">
+      </origin><geometry><box size="0.04 0.04 0.45"/></geometry><material name="orange"/></visual>
+    <!-- Ballscrew actuator tube -->
+    <visual><origin xyz="0.025 0 -0.28" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.015" length="0.32"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.225" rpy="0 0 0">
+      </origin><geometry><box size="0.04 0.04 0.45"/></geometry></collision>
+  </link>
+  <joint name="fr_thigh_joint" type="revolute">
+    <parent link="fr_hip_link"/><child link="fr_thigh_link"/>
+    <origin xyz="0 0 -0.08" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-1.2" upper="0.5" effort="500" velocity="3.0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+  <gazebo reference="fr_thigh_link"><material>Gazebo/Orange</material></gazebo>
+  <link name="fr_shank_link">
+    <inertial><mass value="1.0"/><origin xyz="0 0 -0.25" rpy="0 0 0"/>
+      <inertia ixx="0.021" iyy="0.021" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.25" rpy="0 0 0">
+      </origin><geometry><box size="0.035 0.035 0.50"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 -0.25" rpy="0 0 0">
+      </origin><geometry><box size="0.03 0.03 0.50"/></geometry></collision>
+  </link>
+  <joint name="fr_knee_joint" type="revolute">
+    <parent link="fr_thigh_link"/><child link="fr_shank_link"/>
+    <origin xyz="0 0 -0.45" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-0.1" upper="2.0" effort="800" velocity="5.0"/>
+    <dynamics damping="0.8" friction="0.1"/>
+  </joint>
+  <gazebo reference="fr_shank_link"><material>Gazebo/DarkGrey</material></gazebo>
+  <link name="fr_foot_link">
+    <inertial><mass value="0.2"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0001" iyy="0.0001" izz="0.0001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.04"/></geometry><material name="black"/></visual>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.04"/></geometry></collision>
+  </link>
+  <joint name="fr_foot_joint" type="fixed">
+    <parent link="fr_shank_link"/><child link="fr_foot_link"/>
+    <origin xyz="0 0 -0.50" rpy="0 0 0"/>
+  </joint>
+  <gazebo reference="fr_foot_link">
+    <material>Gazebo/FlatBlack</material>
+    <kp>1000000.0</kp><kd>100.0</kd><mu1>0.8</mu1><mu2>0.8</mu2>
+  </gazebo>
+
+  <!-- ── REAR-LEFT ── -->
+  <link name="rl_hip_link">
+    <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.05" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.04" length="0.10"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.04" rpy="0 0 0">
+      </origin><geometry><cylinder radius="0.03" length="0.08"/></geometry></collision>
+  </link>
+  <joint name="rl_hip_joint" type="revolute">
+    <parent link="base_link"/><child link="rl_hip_link"/>
+    <origin xyz="-0.35 0.18 -0.05" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+  <gazebo reference="rl_hip_link"><material>Gazebo/Grey</material></gazebo>
+  <link name="rl_thigh_link">
+    <inertial><mass value="1.5"/><origin xyz="0 0 -0.225" rpy="0 0 0"/>
+      <inertia ixx="0.025" iyy="0.025" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.225" rpy="0 0 0">
+      </origin><geometry><box size="0.04 0.04 0.45"/></geometry><material name="orange"/></visual>
+    <!-- Ballscrew actuator tube -->
+    <visual><origin xyz="0.025 0 -0.28" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.015" length="0.32"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.225" rpy="0 0 0">
+      </origin><geometry><box size="0.04 0.04 0.45"/></geometry></collision>
+  </link>
+  <joint name="rl_thigh_joint" type="revolute">
+    <parent link="rl_hip_link"/><child link="rl_thigh_link"/>
+    <origin xyz="0 0 -0.08" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-1.2" upper="0.5" effort="500" velocity="3.0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+  <gazebo reference="rl_thigh_link"><material>Gazebo/Orange</material></gazebo>
+  <link name="rl_shank_link">
+    <inertial><mass value="1.0"/><origin xyz="0 0 -0.25" rpy="0 0 0"/>
+      <inertia ixx="0.021" iyy="0.021" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.25" rpy="0 0 0">
+      </origin><geometry><box size="0.035 0.035 0.50"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 -0.25" rpy="0 0 0">
+      </origin><geometry><box size="0.03 0.03 0.50"/></geometry></collision>
+  </link>
+  <joint name="rl_knee_joint" type="revolute">
+    <parent link="rl_thigh_link"/><child link="rl_shank_link"/>
+    <origin xyz="0 0 -0.45" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-0.1" upper="2.0" effort="800" velocity="5.0"/>
+    <dynamics damping="0.8" friction="0.1"/>
+  </joint>
+  <gazebo reference="rl_shank_link"><material>Gazebo/DarkGrey</material></gazebo>
+  <link name="rl_foot_link">
+    <inertial><mass value="0.2"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0001" iyy="0.0001" izz="0.0001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.04"/></geometry><material name="black"/></visual>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.04"/></geometry></collision>
+  </link>
+  <joint name="rl_foot_joint" type="fixed">
+    <parent link="rl_shank_link"/><child link="rl_foot_link"/>
+    <origin xyz="0 0 -0.50" rpy="0 0 0"/>
+  </joint>
+  <gazebo reference="rl_foot_link">
+    <material>Gazebo/FlatBlack</material>
+    <kp>1000000.0</kp><kd>100.0</kd><mu1>0.8</mu1><mu2>0.8</mu2>
+  </gazebo>
+
+  <!-- ── REAR-RIGHT ── -->
+  <link name="rr_hip_link">
+    <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.05" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.04" length="0.10"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.04" rpy="0 0 0">
+      </origin><geometry><cylinder radius="0.03" length="0.08"/></geometry></collision>
+  </link>
+  <joint name="rr_hip_joint" type="revolute">
+    <parent link="base_link"/><child link="rr_hip_link"/>
+    <origin xyz="-0.35 -0.18 -0.05" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+  <gazebo reference="rr_hip_link"><material>Gazebo/Grey</material></gazebo>
+  <link name="rr_thigh_link">
+    <inertial><mass value="1.5"/><origin xyz="0 0 -0.225" rpy="0 0 0"/>
+      <inertia ixx="0.025" iyy="0.025" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.225" rpy="0 0 0">
+      </origin><geometry><box size="0.04 0.04 0.45"/></geometry><material name="orange"/></visual>
+    <!-- Ballscrew actuator tube -->
+    <visual><origin xyz="0.025 0 -0.28" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.015" length="0.32"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.225" rpy="0 0 0">
+      </origin><geometry><box size="0.04 0.04 0.45"/></geometry></collision>
+  </link>
+  <joint name="rr_thigh_joint" type="revolute">
+    <parent link="rr_hip_link"/><child link="rr_thigh_link"/>
+    <origin xyz="0 0 -0.08" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-1.2" upper="0.5" effort="500" velocity="3.0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+  <gazebo reference="rr_thigh_link"><material>Gazebo/Orange</material></gazebo>
+  <link name="rr_shank_link">
+    <inertial><mass value="1.0"/><origin xyz="0 0 -0.25" rpy="0 0 0"/>
+      <inertia ixx="0.021" iyy="0.021" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.25" rpy="0 0 0">
+      </origin><geometry><box size="0.035 0.035 0.50"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 -0.25" rpy="0 0 0">
+      </origin><geometry><box size="0.03 0.03 0.50"/></geometry></collision>
+  </link>
+  <joint name="rr_knee_joint" type="revolute">
+    <parent link="rr_thigh_link"/><child link="rr_shank_link"/>
+    <origin xyz="0 0 -0.45" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-0.1" upper="2.0" effort="800" velocity="5.0"/>
+    <dynamics damping="0.8" friction="0.1"/>
+  </joint>
+  <gazebo reference="rr_shank_link"><material>Gazebo/DarkGrey</material></gazebo>
+  <link name="rr_foot_link">
+    <inertial><mass value="0.2"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0001" iyy="0.0001" izz="0.0001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.04"/></geometry><material name="black"/></visual>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.04"/></geometry></collision>
+  </link>
+  <joint name="rr_foot_joint" type="fixed">
+    <parent link="rr_shank_link"/><child link="rr_foot_link"/>
+    <origin xyz="0 0 -0.50" rpy="0 0 0"/>
+  </joint>
+  <gazebo reference="rr_foot_link">
+    <material>Gazebo/FlatBlack</material>
+    <kp>1000000.0</kp><kd>100.0</kd><mu1>0.8</mu1><mu2>0.8</mu2>
+  </gazebo>
+
+  <!-- ═══════════════════════════════════════════════════════
+       ROS2 CONTROL — hardware interface
+       (gazebo_ros2_control reads this at runtime)
+       12 commanded joints: 4x hip(Z) + 4x thigh(Y) + 4x knee(Y)
+       2 passive joints: cart_to_shaft_steer, shaft_to_horse
+  ═══════════════════════════════════════════════════════ -->
+  <ros2_control name="GazeboSystem" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+
+    <!-- Steering joint — position commanded by blendspace_node -->
+    <joint name="cart_to_shaft_steer">
+      <command_interface name="position">
+        <param name="min">-0.61</param><param name="max">0.61</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+
+    <!-- Passive pitch joint — state only -->
+    <joint name="shaft_to_horse">
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <!-- Front-left -->
+    <joint name="fl_hip_joint">
+      <command_interface name="position">
+        <param name="min">-0.35</param><param name="max">0.35</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="fl_thigh_joint">
+      <command_interface name="position">
+        <param name="min">-1.2</param><param name="max">0.5</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">-0.344</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="fl_knee_joint">
+      <command_interface name="position">
+        <param name="min">-0.1</param><param name="max">2.0</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.651</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+
+    <!-- Front-right -->
+    <joint name="fr_hip_joint">
+      <command_interface name="position">
+        <param name="min">-0.35</param><param name="max">0.35</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="fr_thigh_joint">
+      <command_interface name="position">
+        <param name="min">-1.2</param><param name="max">0.5</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">-0.344</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="fr_knee_joint">
+      <command_interface name="position">
+        <param name="min">-0.1</param><param name="max">2.0</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.651</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+
+    <!-- Rear-left -->
+    <joint name="rl_hip_joint">
+      <command_interface name="position">
+        <param name="min">-0.35</param><param name="max">0.35</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="rl_thigh_joint">
+      <command_interface name="position">
+        <param name="min">-1.2</param><param name="max">0.5</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">-0.344</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="rl_knee_joint">
+      <command_interface name="position">
+        <param name="min">-0.1</param><param name="max">2.0</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.651</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+
+    <!-- Rear-right -->
+    <joint name="rr_hip_joint">
+      <command_interface name="position">
+        <param name="min">-0.35</param><param name="max">0.35</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="rr_thigh_joint">
+      <command_interface name="position">
+        <param name="min">-1.2</param><param name="max">0.5</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">-0.344</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="rr_knee_joint">
+      <command_interface name="position">
+        <param name="min">-0.1</param><param name="max">2.0</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.651</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+  </ros2_control>
+
+  <!-- ═══════════════════════════════════════════════════════
+       GAZEBO PLUGIN — loads gazebo_ros2_control
+  ═══════════════════════════════════════════════════════ -->
+  <gazebo>
+    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>$(find robotic_horse_control)/config/ros2_control.yaml</parameters>
+    </plugin>
+  </gazebo>
+
+</robot>

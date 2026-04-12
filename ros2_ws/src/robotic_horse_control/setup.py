@@ -32,6 +32,7 @@ setup(
             'gait_node        = robotic_horse_control.gait_node:main',
             'force_node       = robotic_horse_control.force_node:main',
             'blendspace_node  = robotic_horse_control.blendspace_node:main',
+            'teleop_key       = robotic_horse_control.teleop_key:main',
         ],
     },
 )

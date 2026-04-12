@@ -1,0 +1,40 @@
+running develop
+running egg_info
+creating robotic_horse_control.egg-info
+writing robotic_horse_control.egg-info/PKG-INFO
+writing dependency_links to robotic_horse_control.egg-info/dependency_links.txt
+writing entry points to robotic_horse_control.egg-info/entry_points.txt
+writing requirements to robotic_horse_control.egg-info/requires.txt
+writing top-level names to robotic_horse_control.egg-info/top_level.txt
+writing manifest file 'robotic_horse_control.egg-info/SOURCES.txt'
+reading manifest file 'robotic_horse_control.egg-info/SOURCES.txt'
+writing manifest file 'robotic_horse_control.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/python3.12/site-packages/robotic-horse-control.egg-link (link to .)
+Installing blendspace_node script to /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/robotic_horse_control
+Installing force_node script to /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/robotic_horse_control
+Installing gait_node script to /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/robotic_horse_control
+
+Installed /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control
+running symlink_data
+creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/ament_index
+creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/ament_index/resource_index
+creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/ament_index/resource_index/packages
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/resource/robotic_horse_control -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/ament_index/resource_index/packages
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/package.xml -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control
+creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/launch
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/launch/blendspace.launch.py -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/launch
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/launch/gazebo.launch.py -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/launch
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/launch/robot_control.launch.py -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/launch
+creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/config
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/config/ros2_control.yaml -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/config
+creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/walk_right.json -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/turn_left.json -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/idle.json -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/walk_left.json -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/walk_forward.json -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/turn_right.json -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/blendspace.yaml -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/worlds
+symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/worlds/robotic_horse.world -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/worlds

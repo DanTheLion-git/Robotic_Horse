@@ -9,10 +9,21 @@ and logs joint torques every step.
 """
 
 import os
+import sys
 import time
 import numpy as np
-import pybullet as pb
-import pybullet_data
+
+# The local pybullet/ directory is loaded as a package before this module runs,
+# leaving an empty stub in sys.modules. Evict it and reload from site-packages.
+_repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.modules.pop('pybullet', None)
+sys.modules.pop('pybullet_data', None)
+_saved_path = sys.path[:]
+sys.path = [p for p in sys.path if p != _repo_root]
+import pybullet as pb          # noqa: E402  — real C extension
+import pybullet_data           # noqa: E402
+sys.path = _saved_path
+del _repo_root, _saved_path
 
 from robot.gait.walk_gait import generate_gait_trajectory, LEG_NAMES
 from robot.kinematics.force_calculator import (
@@ -22,7 +33,7 @@ from robot.kinematics.force_calculator import (
 )
 
 URDF_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "urdf", "robotic_horse.urdf"
+    os.path.dirname(__file__), "..", "robot", "urdf", "robotic_horse.urdf"
 )
 
 # Joint names in the URDF that we actively control

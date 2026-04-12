@@ -1,6 +1,8 @@
 """
-gazebo.launch.py  —  Spawn the Robotic Horse in Gazebo Classic and start
+gazebo.launch.py  —  Spawn the Robotic Horse in Gazebo Harmonic and start
 all ros2_control controllers.
+
+Adapted for ROS2 Jazzy + Gazebo Harmonic (gz sim) on Ubuntu 24.04.
 
 Usage:
     ros2 launch robotic_horse_control gazebo.launch.py
@@ -9,40 +11,51 @@ Usage:
 import os
 from launch import LaunchDescription
 from launch.actions import (
-    DeclareLaunchArgument,
-    ExecuteProcess,
     IncludeLaunchDescription,
-    RegisterEventHandler,
     TimerAction,
 )
-from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
-    Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
+    Command, FindExecutable, PathJoinSubstitution
 )
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from launch_ros.parameter_descriptions import ParameterValue
 from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
     pkg_description = FindPackageShare('robotic_horse_description')
     pkg_control     = FindPackageShare('robotic_horse_control')
-    pkg_gazebo_ros  = get_package_share_directory('gazebo_ros')
 
     # ── Robot description ────────────────────────────────────────────
-    urdf_file = PathJoinSubstitution([pkg_description, 'urdf', 'robotic_horse.urdf'])
-    robot_description = Command([FindExecutable(name='cat'), ' ', urdf_file])
+    urdf_file = PathJoinSubstitution([pkg_description, 'urdf', 'robotic_horse.urdf.xacro'])
+    robot_description = ParameterValue(
+        Command([FindExecutable(name='xacro'), ' ', urdf_file]),
+        value_type=str
+    )
+
+    # ── Controller param files ───────────────────────────────────────
+    jsb_params   = PathJoinSubstitution([pkg_control, 'config', 'joint_state_broadcaster.yaml'])
+    leg_params   = PathJoinSubstitution([pkg_control, 'config', 'leg_controller.yaml'])
+    ctrl_params  = PathJoinSubstitution([pkg_control, 'config', 'ros2_control.yaml'])
 
     # ── World file ───────────────────────────────────────────────────
     world_file = PathJoinSubstitution([pkg_control, 'worlds', 'robotic_horse.world'])
 
-    # ── Launch Gazebo ─────────────────────────────────────────────────
+    # ── Launch Gazebo Harmonic (gz sim) ───────────────────────────────
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_gazebo_ros, 'launch', 'gazebo.launch.py')
+            os.path.join(
+                get_package_share_directory('ros_gz_sim'),
+                'launch',
+                'gz_sim.launch.py',
+            )
         ),
-        launch_arguments={'world': world_file, 'verbose': 'false'}.items(),
+        launch_arguments={
+            'gz_args': ['-r ', world_file],
+            'on_exit_shutdown': 'true',
+        }.items(),
     )
 
     # ── Publish TF from URDF ──────────────────────────────────────────
@@ -56,43 +69,63 @@ def generate_launch_description():
 
     # ── Spawn the robot into Gazebo ───────────────────────────────────
     spawn_robot = Node(
-        package='gazebo_ros',
-        executable='spawn_entity.py',
+        package='ros_gz_sim',
+        executable='create',
         arguments=[
+            '-name', 'robotic_horse',
             '-topic', 'robot_description',
-            '-entity', 'robotic_horse',
-            '-x', '0.0', '-y', '0.0', '-z', '1.15',  # spawn above ground
+            '-x', '-2.5', '-y', '0.0', '-z', '0.55',
         ],
         output='screen',
     )
 
-    # ── Start joint_state_broadcaster (reads joint states from Gazebo) ─
+    # ── Bridge gz clock → ROS2 /clock ────────────────────────────────
+    gz_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=['/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock'],
+        output='screen',
+    )
+
+    # ── Start joint_state_broadcaster ────────────────────────────────
+    # -p jsb_params  : declares the controller type (must be top-level key)
     joint_state_broadcaster_spawner = Node(
         package='controller_manager',
         executable='spawner',
-        arguments=['joint_state_broadcaster', '--controller-manager', '/controller_manager'],
+        arguments=[
+            'joint_state_broadcaster',
+            '--controller-manager', '/controller_manager',
+            '-p', jsb_params,
+        ],
         output='screen',
     )
 
     # ── Start the leg position controller ────────────────────────────
+    # -p leg_params  : declares the controller type
+    # -p ctrl_params : supplies joints, PID gains, interfaces
     leg_controller_spawner = Node(
         package='controller_manager',
         executable='spawner',
-        arguments=['leg_controller', '--controller-manager', '/controller_manager'],
+        arguments=[
+            'leg_controller',
+            '--controller-manager', '/controller_manager',
+            '-p', leg_params,
+            '-p', ctrl_params,
+        ],
         output='screen',
     )
 
-    # Start controllers only after the robot has been spawned
-    start_controllers = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=spawn_robot,
-            on_exit=[joint_state_broadcaster_spawner, leg_controller_spawner],
-        )
+    # Delay controller spawners until gz_ros_control has registered hardware
+    # interfaces (~2 s after entity spawn; 6 s is a safe margin).
+    start_controllers = TimerAction(
+        period=6.0,
+        actions=[joint_state_broadcaster_spawner, leg_controller_spawner],
     )
 
     return LaunchDescription([
         gazebo,
         robot_state_publisher,
+        gz_bridge,
         spawn_robot,
         start_controllers,
     ])

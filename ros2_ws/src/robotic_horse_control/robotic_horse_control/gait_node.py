@@ -42,9 +42,9 @@ def _ik(foot_x: float, foot_z: float):
     r = max(abs(L1 - L2) + 0.001, min(r, L1 + L2 - 0.001))
     cos_k = (r**2 - L1**2 - L2**2) / (2 * L1 * L2)
     cos_k = max(-1.0, min(1.0, cos_k))
-    theta_knee = -math.acos(cos_k)
+    theta_knee = +math.acos(cos_k)  # elbow-up (Spot-like)
     alpha = math.atan2(foot_x, -foot_z)
-    beta  = math.asin(max(-1.0, min(1.0, L2 * math.sin(-theta_knee) / r)))
+    beta  = math.asin(max(-1.0, min(1.0, L2 * math.sin(theta_knee) / r)))
     return alpha - beta, theta_knee
 
 
@@ -118,4 +118,5 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()

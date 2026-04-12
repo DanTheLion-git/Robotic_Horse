@@ -1,0 +1,42 @@
+[0.632s] Invoking command in '/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control': AMENT_PREFIX_PATH=/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description:${CMAKE_PREFIX_PATH} DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/build --no-deps symlink_data
+[0.838s] running develop
+[0.983s] running egg_info
+[0.983s] creating robotic_horse_control.egg-info
+[0.995s] writing robotic_horse_control.egg-info/PKG-INFO
+[0.995s] writing dependency_links to robotic_horse_control.egg-info/dependency_links.txt
+[0.995s] writing entry points to robotic_horse_control.egg-info/entry_points.txt
+[0.995s] writing requirements to robotic_horse_control.egg-info/requires.txt
+[0.995s] writing top-level names to robotic_horse_control.egg-info/top_level.txt
+[0.995s] writing manifest file 'robotic_horse_control.egg-info/SOURCES.txt'
+[1.021s] reading manifest file 'robotic_horse_control.egg-info/SOURCES.txt'
+[1.022s] writing manifest file 'robotic_horse_control.egg-info/SOURCES.txt'
+[1.036s] running build_ext
+[1.036s] Creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/python3.12/site-packages/robotic-horse-control.egg-link (link to .)
+[1.036s] Installing blendspace_node script to /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/robotic_horse_control
+[1.036s] Installing force_node script to /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/robotic_horse_control
+[1.036s] Installing gait_node script to /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/robotic_horse_control
+[1.036s] 
+[1.036s] Installed /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control
+[1.036s] running symlink_data
+[1.036s] creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/ament_index
+[1.036s] creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/ament_index/resource_index
+[1.036s] creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/ament_index/resource_index/packages
+[1.036s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/resource/robotic_horse_control -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/ament_index/resource_index/packages
+[1.037s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/package.xml -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control
+[1.037s] creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/launch
+[1.037s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/launch/blendspace.launch.py -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/launch
+[1.037s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/launch/gazebo.launch.py -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/launch
+[1.037s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/launch/robot_control.launch.py -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/launch
+[1.037s] creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/config
+[1.037s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/config/ros2_control.yaml -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/config
+[1.037s] creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+[1.037s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/walk_right.json -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+[1.037s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/turn_left.json -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+[1.037s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/idle.json -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+[1.037s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/walk_left.json -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+[1.037s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/walk_forward.json -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+[1.037s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/turn_right.json -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+[1.037s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/blendspace.yaml -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/animations
+[1.037s] creating /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/worlds
+[1.037s] symbolically linking /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/worlds/robotic_horse.world -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/worlds
+[1.058s] Invoked command in '/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control' returned '0': AMENT_PREFIX_PATH=/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_description:${CMAKE_PREFIX_PATH} DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/build --no-deps symlink_data
