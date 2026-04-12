@@ -75,25 +75,25 @@
        CoM shifted -0.15m rear to counterbalance neck/head forward mass. -->
   <link name="base_link">
     <inertial>
-      <mass value="45.0"/>
-      <origin xyz="-0.15 0 0" rpy="0 0 0"/>
-      <inertia ixx="1.202" iyy="4.875" izz="5.402" ixy="0" ixz="0" iyz="0"/>
+      <mass value="60.0"/>
+      <origin xyz="-0.10 0 0" rpy="0 0 0"/>
+      <inertia ixx="2.234" iyy="7.563" izz="6.772" ixy="0" ixz="0" iyz="0"/>
     </inertial>
     <!-- Main body panel -->
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><box size="1.10 0.48 0.30"/></geometry>
+      <geometry><box size="1.10 0.38 0.55"/></geometry>
       <material name="body_panel"/>
     </visual>
     <!-- Top saddle plate -->
     <visual>
-      <origin xyz="-0.06 0 0.15" rpy="0 0 0"/>
-      <geometry><box size="0.70 0.35 0.04"/></geometry>
+      <origin xyz="-0.06 0 0.275" rpy="0 0 0"/>
+      <geometry><box size="0.70 0.32 0.04"/></geometry>
       <material name="silver"/>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><box size="1.10 0.55 0.30"/></geometry>
+      <geometry><box size="1.10 0.45 0.55"/></geometry>
     </collision>
   </link>
   <gazebo reference="base_link">
@@ -116,7 +116,7 @@
   </link>
   <joint name="neck_joint" type="fixed">
     <parent link="base_link"/><child link="neck_link"/>
-    <origin xyz="0.62 0 0.15" rpy="0 -0.698 0"/>
+    <origin xyz="0.52 0 0.265" rpy="0 -0.698 0"/>
   </joint>
   <gazebo reference="neck_link"><material>Gazebo/Brown</material></gazebo>
 
@@ -155,14 +155,14 @@
   <link name="fl_hip_link">
     <inertial><mass value="4.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.012" iyy="0.012" izz="0.007" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.08" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.06" length="0.16"/></geometry><material name="silver"/></visual>
+    <visual><origin xyz="0 0 -0.06" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.05" length="0.12"/></geometry><material name="silver"/></visual>
     <collision><origin xyz="0 0 -0.07" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.04" length="0.14"/></geometry></collision>
+      <geometry><cylinder radius="0.04" length="0.10"/></geometry></collision>
   </link>
   <joint name="fl_hip_joint" type="revolute">
     <parent link="base_link"/><child link="fl_hip_link"/>
-    <origin xyz="0.55 0.28 -0.08" rpy="0 0 0"/>
+    <origin xyz="0.43 0.19 -0.22" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
     <dynamics damping="2.5" friction="0.3"/>
@@ -172,17 +172,17 @@
   <link name="fl_thigh_link">
     <inertial><mass value="5.5"/><origin xyz="0 0 -0.30" rpy="0 0 0"/>
       <inertia ixx="0.170" iyy="0.170" izz="0.010" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.30" rpy="0 0 0"/>
-      <geometry><box size="0.06 0.06 0.60"/></geometry><material name="orange"/></visual>
+    <visual><origin xyz="0 0 -0.19" rpy="0 0 0"/>
+      <geometry><box size="0.055 0.055 0.38"/></geometry><material name="orange"/></visual>
     <!-- Ballscrew actuator tube -->
-    <visual><origin xyz="0.04 0 -0.30" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.022" length="0.40"/></geometry><material name="silver"/></visual>
-    <collision><origin xyz="0 0 -0.30" rpy="0 0 0">
-      </origin><geometry><box size="0.06 0.06 0.60"/></geometry></collision>
+    <visual><origin xyz="0.035 0 -0.19" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.018" length="0.25"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.19" rpy="0 0 0">
+      </origin><geometry><box size="0.055 0.055 0.38"/></geometry></collision>
   </link>
   <joint name="fl_thigh_joint" type="revolute">
     <parent link="fl_hip_link"/><child link="fl_thigh_link"/>
-    <origin xyz="0 0 -0.13" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <origin xyz="0 0 -0.10" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.8" upper="1.8" effort="500" velocity="3.0"/>
     <dynamics damping="2.5" friction="0.3"/>
   </joint>
@@ -191,14 +191,14 @@
   <link name="fl_shank_link">
     <inertial><mass value="4.0"/><origin xyz="0 0 -0.30" rpy="0 0 0"/>
       <inertia ixx="0.122" iyy="0.122" izz="0.004" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.30" rpy="0 0 0">
-      </origin><geometry><box size="0.050 0.050 0.60"/></geometry><material name="dark_grey"/></visual>
-    <collision><origin xyz="0 0 -0.19" rpy="0 0 0">
-      </origin><geometry><box size="0.04 0.04 0.60"/></geometry></collision>
+    <visual><origin xyz="0 0 -0.18" rpy="0 0 0">
+      </origin><geometry><box size="0.045 0.045 0.36"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 -0.18" rpy="0 0 0">
+      </origin><geometry><box size="0.04 0.04 0.36"/></geometry></collision>
   </link>
   <joint name="fl_knee_joint" type="revolute">
     <parent link="fl_thigh_link"/><child link="fl_shank_link"/>
-    <origin xyz="0 0 -0.60" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <origin xyz="0 0 -0.38" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.8" upper="2.0" effort="800" velocity="5.0"/>
     <dynamics damping="3.5" friction="0.3"/>
   </joint>
@@ -206,16 +206,16 @@
 
   <!-- Cannon bone (metatarsal/metacarpal): pantograph-kept near vertical -->
   <link name="fl_cannon_link">
-    <inertial><mass value="1.5"/><origin xyz="0 0 -0.175" rpy="0 0 0"/>
-      <inertia ixx="0.0155" iyy="0.0155" izz="0.0003" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.175" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.018" length="0.35"/></geometry><material name="dark_grey"/></visual>
-    <collision><origin xyz="0 0 -0.175" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.014" length="0.35"/></geometry></collision>
+    <inertial><mass value="1.0"/><origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <inertia ixx="0.0053" iyy="0.0053" izz="0.0001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.015" length="0.25"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.012" length="0.25"/></geometry></collision>
   </link>
   <joint name="fl_cannon_joint" type="revolute">
     <parent link="fl_shank_link"/><child link="fl_cannon_link"/>
-    <origin xyz="0 0 -0.60" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <origin xyz="0 0 -0.36" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-2.0" upper="2.0" effort="100" velocity="6.0"/>
     <dynamics damping="1.0" friction="0.1"/>
   </joint>
@@ -225,13 +225,13 @@
     <inertial><mass value="0.4"/><origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.00026" iyy="0.00026" izz="0.00026" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><sphere radius="0.06"/></geometry><material name="black"/></visual>
+      <geometry><sphere radius="0.05"/></geometry><material name="black"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><sphere radius="0.06"/></geometry></collision>
+      <geometry><sphere radius="0.05"/></geometry></collision>
   </link>
   <joint name="fl_foot_joint" type="fixed">
     <parent link="fl_cannon_link"/><child link="fl_foot_link"/>
-    <origin xyz="0 0 -0.35" rpy="0 0 0"/>
+    <origin xyz="0 0 -0.25" rpy="0 0 0"/>
   </joint>
   <gazebo reference="fl_foot_link">
     <material>Gazebo/FlatBlack</material>
@@ -243,14 +243,14 @@
   <link name="fr_hip_link">
     <inertial><mass value="4.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.012" iyy="0.012" izz="0.007" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.08" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.06" length="0.16"/></geometry><material name="silver"/></visual>
-    <collision><origin xyz="0 0 -0.07" rpy="0 0 0">
-      </origin><geometry><cylinder radius="0.04" length="0.14"/></geometry></collision>
+    <visual><origin xyz="0 0 -0.06" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.05" length="0.12"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.05" rpy="0 0 0">
+      </origin><geometry><cylinder radius="0.04" length="0.10"/></geometry></collision>
   </link>
   <joint name="fr_hip_joint" type="revolute">
     <parent link="base_link"/><child link="fr_hip_link"/>
-    <origin xyz="0.55 -0.28 -0.08" rpy="0 0 0"/>
+    <origin xyz="0.43 -0.19 -0.22" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
     <dynamics damping="2.5" friction="0.3"/>
@@ -259,17 +259,17 @@
   <link name="fr_thigh_link">
     <inertial><mass value="5.5"/><origin xyz="0 0 -0.30" rpy="0 0 0"/>
       <inertia ixx="0.170" iyy="0.170" izz="0.010" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.30" rpy="0 0 0">
-      </origin><geometry><box size="0.06 0.06 0.60"/></geometry><material name="orange"/></visual>
+    <visual><origin xyz="0 0 -0.19" rpy="0 0 0">
+      </origin><geometry><box size="0.055 0.055 0.38"/></geometry><material name="orange"/></visual>
     <!-- Ballscrew actuator tube -->
-    <visual><origin xyz="0.04 0 -0.30" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.022" length="0.40"/></geometry><material name="silver"/></visual>
-    <collision><origin xyz="0 0 -0.30" rpy="0 0 0">
-      </origin><geometry><box size="0.06 0.06 0.60"/></geometry></collision>
+    <visual><origin xyz="0.035 0 -0.19" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.018" length="0.25"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.19" rpy="0 0 0">
+      </origin><geometry><box size="0.055 0.055 0.38"/></geometry></collision>
   </link>
   <joint name="fr_thigh_joint" type="revolute">
     <parent link="fr_hip_link"/><child link="fr_thigh_link"/>
-    <origin xyz="0 0 -0.13" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <origin xyz="0 0 -0.10" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.8" upper="1.8" effort="500" velocity="3.0"/>
     <dynamics damping="2.5" friction="0.3"/>
   </joint>
@@ -277,30 +277,30 @@
   <link name="fr_shank_link">
     <inertial><mass value="4.0"/><origin xyz="0 0 -0.30" rpy="0 0 0"/>
       <inertia ixx="0.122" iyy="0.122" izz="0.004" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.30" rpy="0 0 0">
-      </origin><geometry><box size="0.050 0.050 0.60"/></geometry><material name="dark_grey"/></visual>
-    <collision><origin xyz="0 0 -0.19" rpy="0 0 0">
-      </origin><geometry><box size="0.04 0.04 0.60"/></geometry></collision>
+    <visual><origin xyz="0 0 -0.18" rpy="0 0 0">
+      </origin><geometry><box size="0.045 0.045 0.36"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 -0.18" rpy="0 0 0">
+      </origin><geometry><box size="0.04 0.04 0.36"/></geometry></collision>
   </link>
   <joint name="fr_knee_joint" type="revolute">
     <parent link="fr_thigh_link"/><child link="fr_shank_link"/>
-    <origin xyz="0 0 -0.60" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <origin xyz="0 0 -0.38" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.8" upper="2.0" effort="800" velocity="5.0"/>
     <dynamics damping="3.5" friction="0.3"/>
   </joint>
   <gazebo reference="fr_shank_link"><material>Gazebo/DarkGrey</material></gazebo>
   <!-- Cannon bone (metatarsal/metacarpal): pantograph-kept near vertical -->
   <link name="fr_cannon_link">
-    <inertial><mass value="1.5"/><origin xyz="0 0 -0.175" rpy="0 0 0"/>
-      <inertia ixx="0.0155" iyy="0.0155" izz="0.0003" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.175" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.018" length="0.35"/></geometry><material name="dark_grey"/></visual>
-    <collision><origin xyz="0 0 -0.175" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.014" length="0.35"/></geometry></collision>
+    <inertial><mass value="1.0"/><origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <inertia ixx="0.0053" iyy="0.0053" izz="0.0001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.015" length="0.25"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.012" length="0.25"/></geometry></collision>
   </link>
   <joint name="fr_cannon_joint" type="revolute">
     <parent link="fr_shank_link"/><child link="fr_cannon_link"/>
-    <origin xyz="0 0 -0.60" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <origin xyz="0 0 -0.36" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-2.0" upper="2.0" effort="100" velocity="6.0"/>
     <dynamics damping="1.0" friction="0.1"/>
   </joint>
@@ -310,13 +310,13 @@
     <inertial><mass value="0.4"/><origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.00026" iyy="0.00026" izz="0.00026" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><sphere radius="0.06"/></geometry><material name="black"/></visual>
+      <geometry><sphere radius="0.05"/></geometry><material name="black"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><sphere radius="0.06"/></geometry></collision>
+      <geometry><sphere radius="0.05"/></geometry></collision>
   </link>
   <joint name="fr_foot_joint" type="fixed">
     <parent link="fr_cannon_link"/><child link="fr_foot_link"/>
-    <origin xyz="0 0 -0.35" rpy="0 0 0"/>
+    <origin xyz="0 0 -0.25" rpy="0 0 0"/>
   </joint>
   <gazebo reference="fr_foot_link">
     <material>Gazebo/FlatBlack</material>
@@ -327,14 +327,14 @@
   <link name="rl_hip_link">
     <inertial><mass value="4.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.012" iyy="0.012" izz="0.007" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.08" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.06" length="0.16"/></geometry><material name="silver"/></visual>
-    <collision><origin xyz="0 0 -0.07" rpy="0 0 0">
-      </origin><geometry><cylinder radius="0.04" length="0.14"/></geometry></collision>
+    <visual><origin xyz="0 0 -0.06" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.05" length="0.12"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.05" rpy="0 0 0">
+      </origin><geometry><cylinder radius="0.04" length="0.10"/></geometry></collision>
   </link>
   <joint name="rl_hip_joint" type="revolute">
     <parent link="base_link"/><child link="rl_hip_link"/>
-    <origin xyz="-0.55 0.28 -0.08" rpy="0 0 0"/>
+    <origin xyz="-0.43 0.19 -0.22" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
     <dynamics damping="2.5" friction="0.3"/>
@@ -343,17 +343,17 @@
   <link name="rl_thigh_link">
     <inertial><mass value="5.5"/><origin xyz="0 0 -0.30" rpy="0 0 0"/>
       <inertia ixx="0.170" iyy="0.170" izz="0.010" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.30" rpy="0 0 0">
-      </origin><geometry><box size="0.06 0.06 0.60"/></geometry><material name="orange"/></visual>
+    <visual><origin xyz="0 0 -0.19" rpy="0 0 0">
+      </origin><geometry><box size="0.055 0.055 0.38"/></geometry><material name="orange"/></visual>
     <!-- Ballscrew actuator tube -->
-    <visual><origin xyz="0.04 0 -0.30" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.022" length="0.40"/></geometry><material name="silver"/></visual>
-    <collision><origin xyz="0 0 -0.30" rpy="0 0 0">
-      </origin><geometry><box size="0.06 0.06 0.60"/></geometry></collision>
+    <visual><origin xyz="0.035 0 -0.19" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.018" length="0.25"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.19" rpy="0 0 0">
+      </origin><geometry><box size="0.055 0.055 0.38"/></geometry></collision>
   </link>
   <joint name="rl_thigh_joint" type="revolute">
     <parent link="rl_hip_link"/><child link="rl_thigh_link"/>
-    <origin xyz="0 0 -0.13" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <origin xyz="0 0 -0.10" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.8" upper="1.8" effort="500" velocity="3.0"/>
     <dynamics damping="2.5" friction="0.3"/>
   </joint>
@@ -361,30 +361,30 @@
   <link name="rl_shank_link">
     <inertial><mass value="4.0"/><origin xyz="0 0 -0.30" rpy="0 0 0"/>
       <inertia ixx="0.122" iyy="0.122" izz="0.004" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.30" rpy="0 0 0">
-      </origin><geometry><box size="0.050 0.050 0.60"/></geometry><material name="dark_grey"/></visual>
-    <collision><origin xyz="0 0 -0.19" rpy="0 0 0">
-      </origin><geometry><box size="0.04 0.04 0.60"/></geometry></collision>
+    <visual><origin xyz="0 0 -0.18" rpy="0 0 0">
+      </origin><geometry><box size="0.045 0.045 0.36"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 -0.18" rpy="0 0 0">
+      </origin><geometry><box size="0.04 0.04 0.36"/></geometry></collision>
   </link>
   <joint name="rl_knee_joint" type="revolute">
     <parent link="rl_thigh_link"/><child link="rl_shank_link"/>
-    <origin xyz="0 0 -0.60" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <origin xyz="0 0 -0.38" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.8" upper="2.0" effort="800" velocity="5.0"/>
     <dynamics damping="3.5" friction="0.3"/>
   </joint>
   <gazebo reference="rl_shank_link"><material>Gazebo/DarkGrey</material></gazebo>
   <!-- Cannon bone (metatarsal/metacarpal): pantograph-kept near vertical -->
   <link name="rl_cannon_link">
-    <inertial><mass value="1.5"/><origin xyz="0 0 -0.175" rpy="0 0 0"/>
-      <inertia ixx="0.0155" iyy="0.0155" izz="0.0003" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.175" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.018" length="0.35"/></geometry><material name="dark_grey"/></visual>
-    <collision><origin xyz="0 0 -0.175" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.014" length="0.35"/></geometry></collision>
+    <inertial><mass value="1.0"/><origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <inertia ixx="0.0053" iyy="0.0053" izz="0.0001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.015" length="0.25"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.012" length="0.25"/></geometry></collision>
   </link>
   <joint name="rl_cannon_joint" type="revolute">
     <parent link="rl_shank_link"/><child link="rl_cannon_link"/>
-    <origin xyz="0 0 -0.60" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <origin xyz="0 0 -0.36" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-2.0" upper="2.0" effort="100" velocity="6.0"/>
     <dynamics damping="1.0" friction="0.1"/>
   </joint>
@@ -394,13 +394,13 @@
     <inertial><mass value="0.4"/><origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.00026" iyy="0.00026" izz="0.00026" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><sphere radius="0.06"/></geometry><material name="black"/></visual>
+      <geometry><sphere radius="0.05"/></geometry><material name="black"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><sphere radius="0.06"/></geometry></collision>
+      <geometry><sphere radius="0.05"/></geometry></collision>
   </link>
   <joint name="rl_foot_joint" type="fixed">
     <parent link="rl_cannon_link"/><child link="rl_foot_link"/>
-    <origin xyz="0 0 -0.35" rpy="0 0 0"/>
+    <origin xyz="0 0 -0.25" rpy="0 0 0"/>
   </joint>
   <gazebo reference="rl_foot_link">
     <material>Gazebo/FlatBlack</material>
@@ -411,14 +411,14 @@
   <link name="rr_hip_link">
     <inertial><mass value="4.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.012" iyy="0.012" izz="0.007" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.08" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.06" length="0.16"/></geometry><material name="silver"/></visual>
-    <collision><origin xyz="0 0 -0.07" rpy="0 0 0">
-      </origin><geometry><cylinder radius="0.04" length="0.14"/></geometry></collision>
+    <visual><origin xyz="0 0 -0.06" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.05" length="0.12"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.05" rpy="0 0 0">
+      </origin><geometry><cylinder radius="0.04" length="0.10"/></geometry></collision>
   </link>
   <joint name="rr_hip_joint" type="revolute">
     <parent link="base_link"/><child link="rr_hip_link"/>
-    <origin xyz="-0.55 -0.28 -0.08" rpy="0 0 0"/>
+    <origin xyz="-0.43 -0.19 -0.22" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
     <dynamics damping="2.5" friction="0.3"/>
@@ -427,17 +427,17 @@
   <link name="rr_thigh_link">
     <inertial><mass value="5.5"/><origin xyz="0 0 -0.30" rpy="0 0 0"/>
       <inertia ixx="0.170" iyy="0.170" izz="0.010" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.30" rpy="0 0 0">
-      </origin><geometry><box size="0.06 0.06 0.60"/></geometry><material name="orange"/></visual>
+    <visual><origin xyz="0 0 -0.19" rpy="0 0 0">
+      </origin><geometry><box size="0.055 0.055 0.38"/></geometry><material name="orange"/></visual>
     <!-- Ballscrew actuator tube -->
-    <visual><origin xyz="0.04 0 -0.30" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.022" length="0.40"/></geometry><material name="silver"/></visual>
-    <collision><origin xyz="0 0 -0.30" rpy="0 0 0">
-      </origin><geometry><box size="0.06 0.06 0.60"/></geometry></collision>
+    <visual><origin xyz="0.035 0 -0.19" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.018" length="0.25"/></geometry><material name="silver"/></visual>
+    <collision><origin xyz="0 0 -0.19" rpy="0 0 0">
+      </origin><geometry><box size="0.055 0.055 0.38"/></geometry></collision>
   </link>
   <joint name="rr_thigh_joint" type="revolute">
     <parent link="rr_hip_link"/><child link="rr_thigh_link"/>
-    <origin xyz="0 0 -0.13" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <origin xyz="0 0 -0.10" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.8" upper="1.8" effort="500" velocity="3.0"/>
     <dynamics damping="2.5" friction="0.3"/>
   </joint>
@@ -445,30 +445,30 @@
   <link name="rr_shank_link">
     <inertial><mass value="4.0"/><origin xyz="0 0 -0.30" rpy="0 0 0"/>
       <inertia ixx="0.122" iyy="0.122" izz="0.004" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.30" rpy="0 0 0">
-      </origin><geometry><box size="0.050 0.050 0.60"/></geometry><material name="dark_grey"/></visual>
-    <collision><origin xyz="0 0 -0.19" rpy="0 0 0">
-      </origin><geometry><box size="0.04 0.04 0.60"/></geometry></collision>
+    <visual><origin xyz="0 0 -0.18" rpy="0 0 0">
+      </origin><geometry><box size="0.045 0.045 0.36"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 -0.18" rpy="0 0 0">
+      </origin><geometry><box size="0.04 0.04 0.36"/></geometry></collision>
   </link>
   <joint name="rr_knee_joint" type="revolute">
     <parent link="rr_thigh_link"/><child link="rr_shank_link"/>
-    <origin xyz="0 0 -0.60" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <origin xyz="0 0 -0.38" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.8" upper="2.0" effort="800" velocity="5.0"/>
     <dynamics damping="3.5" friction="0.3"/>
   </joint>
   <gazebo reference="rr_shank_link"><material>Gazebo/DarkGrey</material></gazebo>
   <!-- Cannon bone (metatarsal/metacarpal): pantograph-kept near vertical -->
   <link name="rr_cannon_link">
-    <inertial><mass value="1.5"/><origin xyz="0 0 -0.175" rpy="0 0 0"/>
-      <inertia ixx="0.0155" iyy="0.0155" izz="0.0003" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 -0.175" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.018" length="0.35"/></geometry><material name="dark_grey"/></visual>
-    <collision><origin xyz="0 0 -0.175" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.014" length="0.35"/></geometry></collision>
+    <inertial><mass value="1.0"/><origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <inertia ixx="0.0053" iyy="0.0053" izz="0.0001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.015" length="0.25"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.012" length="0.25"/></geometry></collision>
   </link>
   <joint name="rr_cannon_joint" type="revolute">
     <parent link="rr_shank_link"/><child link="rr_cannon_link"/>
-    <origin xyz="0 0 -0.60" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <origin xyz="0 0 -0.36" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-2.0" upper="2.0" effort="100" velocity="6.0"/>
     <dynamics damping="1.0" friction="0.1"/>
   </joint>
@@ -478,13 +478,13 @@
     <inertial><mass value="0.4"/><origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.00026" iyy="0.00026" izz="0.00026" ixy="0" ixz="0" iyz="0"/></inertial>
     <visual><origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><sphere radius="0.06"/></geometry><material name="black"/></visual>
+      <geometry><sphere radius="0.05"/></geometry><material name="black"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><sphere radius="0.06"/></geometry></collision>
+      <geometry><sphere radius="0.05"/></geometry></collision>
   </link>
   <joint name="rr_foot_joint" type="fixed">
     <parent link="rr_cannon_link"/><child link="rr_foot_link"/>
-    <origin xyz="0 0 -0.35" rpy="0 0 0"/>
+    <origin xyz="0 0 -0.25" rpy="0 0 0"/>
   </joint>
   <gazebo reference="rr_foot_link">
     <material>Gazebo/FlatBlack</material>
@@ -517,7 +517,7 @@
         <param name="min">-1.8</param><param name="max">1.8</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">0.516</param>
+        <param name="initial_value">0.476</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -527,7 +527,7 @@
         <param name="min">-1.8</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">-1.031</param>
+        <param name="initial_value">-0.981</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -537,7 +537,7 @@
         <param name="min">-2.0</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">0.666</param>
+        <param name="initial_value">0.655</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -559,7 +559,7 @@
         <param name="min">-1.8</param><param name="max">1.8</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">0.516</param>
+        <param name="initial_value">0.476</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -569,7 +569,7 @@
         <param name="min">-1.8</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">-1.031</param>
+        <param name="initial_value">-0.981</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -579,7 +579,7 @@
         <param name="min">-2.0</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">0.666</param>
+        <param name="initial_value">0.655</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -601,7 +601,7 @@
         <param name="min">-1.8</param><param name="max">1.8</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">-0.516</param>
+        <param name="initial_value">-0.476</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -611,7 +611,7 @@
         <param name="min">-1.8</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">1.031</param>
+        <param name="initial_value">0.981</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -621,7 +621,7 @@
         <param name="min">-2.0</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">-0.366</param>
+        <param name="initial_value">-0.355</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -643,7 +643,7 @@
         <param name="min">-1.8</param><param name="max">1.8</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">-0.516</param>
+        <param name="initial_value">-0.476</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -653,7 +653,7 @@
         <param name="min">-1.8</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">1.031</param>
+        <param name="initial_value">0.981</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -663,7 +663,7 @@
         <param name="min">-2.0</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">-0.366</param>
+        <param name="initial_value">-0.355</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>

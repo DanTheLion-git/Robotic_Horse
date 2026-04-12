@@ -1,11 +1,11 @@
 """
-blendspace_node.py  —  Elk-accurate velocity-driven gait controller (v4).
+blendspace_node.py  —  Elk-accurate velocity-driven gait controller (v5).
 
-Red deer (Cervus elaphus) male prime dimensions:
-  Hip height    : 1.45 m   (body height, back ~1.60 m)
-  Thigh / Shank : 0.60 m each
-  Cannon bone   : 0.35 m
-  Hoof radius   : 0.06 m
+Red deer (Cervus elaphus) large prime male — accurate 1:1 dimensions:
+  Withers (back): ~1.55 m   Belly height: ~1.00 m
+  Thigh (L1)    : 0.38 m    Lower leg (L2): 0.36 m
+  Cannon (L3)   : 0.25 m    Hoof radius:    0.05 m
+  Knee bend      : 56 deg at neutral — natural deer standing pose
 
 Leg configuration:
   FRONT (FL/FR): elbow-DOWN — carpal bends FORWARD (away from cart)
@@ -29,43 +29,49 @@ from sensor_msgs.msg import JointState, Imu
 from builtin_interfaces.msg import Duration
 
 
-# ── Robot geometry (must match URDF) ─────────────────────────────────────────
-L1 = 0.60           # thigh length        [m]
-L2 = 0.60           # shank length        [m]
-L3 = 0.35           # cannon bone length  [m]
+# ── Robot geometry (must match URDF exactly) ─────────────────────────────────
+# Large male red deer — 1:1 scale, withers ~1.55m
+L1 = 0.38           # thigh length        [m]  (was 0.60, reduced for proper deer ratio)
+L2 = 0.36           # shank length        [m]  (was 0.60)
+L3 = 0.25           # cannon bone length  [m]  (was 0.35)
 CANNON_LEAN = 0.15  # cannon forward lean [rad] (~8.6 deg)
-FOOT_R = 0.06       # hoof radius         [m]
+FOOT_R = 0.05       # hoof radius         [m]  (was 0.06)
 
-BODY_HEIGHT  = 1.45
-ANKLE_HEIGHT = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # ~1.044 m
+# Hip joint (thigh_joint) height from ground at nominal settled pose.
+# body_center = 1.27m, hip_Z_from_body = -0.22m, bracket = -0.10m
+# → thigh_joint = 1.27 - 0.22 - 0.10 = 0.95m
+BODY_HEIGHT  = 0.95
+ANKLE_HEIGHT = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # 0.6528 m
 
-# Hip positions in base_link (x=fwd-from-cart, y=left, z=up)
+# Hip positions in base_link (x=fwd, y=left, z=up)
+# Body: 1.10m L × 0.38m W × 0.55m H; hip joints near belly at z=-0.22, x=±0.43, y=±0.19
 LEG_POS = {
-    'fl': ( 0.55,  0.28),
-    'fr': ( 0.55, -0.28),
-    'rl': (-0.55,  0.28),
-    'rr': (-0.55, -0.28),
+    'fl': ( 0.43,  0.19),
+    'fr': ( 0.43, -0.19),
+    'rl': (-0.43,  0.19),
+    'rr': (-0.43, -0.19),
 }
-HALF_BODY_LENGTH = 0.55
+HALF_BODY_LENGTH = 0.43
 
 FRONT_LEGS = ('fl', 'fr')
 REAR_LEGS  = ('rl', 'rr')
 
-# ── Neutral poses (verified by FK: ankle at (0,0,-ANKLE_HEIGHT)) ──────────────
-NEUTRAL_THIGH_FRONT  = +0.516
-NEUTRAL_KNEE_FRONT   = -1.031
-NEUTRAL_CANNON_FRONT = +0.666   # CANNON_LEAN - (0.516 + -1.031)
+# ── Neutral poses (computed from IK at ankle straight down) ──────────────────
+# ANKLE_HEIGHT=0.6528, L1=0.38, L2=0.36: knee=-0.981rad(56deg), thigh=+/-0.476rad
+NEUTRAL_THIGH_FRONT  = +0.476
+NEUTRAL_KNEE_FRONT   = -0.981
+NEUTRAL_CANNON_FRONT = +0.655   # CANNON_LEAN - (0.476 + -0.981) = 0.15 + 0.505 = 0.655
 
-NEUTRAL_THIGH_REAR   = -0.516
-NEUTRAL_KNEE_REAR    = +1.031
-NEUTRAL_CANNON_REAR  = -0.366   # CANNON_LEAN - (-0.516 + 1.031)
+NEUTRAL_THIGH_REAR   = -0.476
+NEUTRAL_KNEE_REAR    = +0.981
+NEUTRAL_CANNON_REAR  = -0.355   # CANNON_LEAN - (-0.476 + 0.981) = 0.15 - 0.505 = -0.355
 
 # ── Elk gait parameters ───────────────────────────────────────────────────────
 WALK = dict(
     phase_offsets={'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
     swing_frac=0.22,
-    step_height=0.10,   # world-frame base clearance at walk (pitch compensation adds on top)
-    min_stride=0.25,    # m — step size stays large even at slow pace (50 cm full stride)
+    step_height=0.08,   # base foot clearance — pitch compensation adds on top
+    min_stride=0.25,    # m — large step even at slow pace (50 cm full stride)
     period=1.6,
     name='WALK',
 )
@@ -73,8 +79,8 @@ WALK = dict(
 TROT = dict(
     phase_offsets={'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0},
     swing_frac=0.32,
-    step_height=0.18,
-    min_stride=0.35,    # m — 70 cm full stride minimum at trot
+    step_height=0.14,
+    min_stride=0.35,
     period=0.90,
     name='TROT',
 )
@@ -82,8 +88,8 @@ TROT = dict(
 GALLOP = dict(
     phase_offsets={'fl': 0.0, 'rl': 0.15, 'fr': 0.50, 'rr': 0.65},
     swing_frac=0.42,
-    step_height=0.28,
-    min_stride=0.50,    # m — 100 cm full stride minimum at gallop
+    step_height=0.22,
+    min_stride=0.50,
     period=0.50,
     name='GALLOP',
 )
