@@ -25,8 +25,7 @@ import rclpy
 from rclpy.node import Node
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from geometry_msgs.msg import Twist
-from sensor_msgs.msg import JointState
-from std_msgs.msg import String
+from sensor_msgs.msg import JointState, Imu
 from builtin_interfaces.msg import Duration
 
 
@@ -66,6 +65,7 @@ WALK = dict(
     phase_offsets={'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
     swing_frac=0.22,
     step_height=0.10,   # world-frame base clearance at walk (pitch compensation adds on top)
+    min_stride=0.25,    # m — step size stays large even at slow pace (50 cm full stride)
     period=1.6,
     name='WALK',
 )
@@ -73,7 +73,8 @@ WALK = dict(
 TROT = dict(
     phase_offsets={'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0},
     swing_frac=0.32,
-    step_height=0.18,   # trot: moderate lift
+    step_height=0.18,
+    min_stride=0.35,    # m — 70 cm full stride minimum at trot
     period=0.90,
     name='TROT',
 )
@@ -81,7 +82,8 @@ TROT = dict(
 GALLOP = dict(
     phase_offsets={'fl': 0.0, 'rl': 0.15, 'fr': 0.50, 'rr': 0.65},
     swing_frac=0.42,
-    step_height=0.28,   # gallop: full bounding stride
+    step_height=0.28,
+    min_stride=0.50,    # m — 100 cm full stride minimum at gallop
     period=0.50,
     name='GALLOP',
 )
@@ -94,22 +96,37 @@ TROT_MAX_SPEED   = 3.5   # m/s — below this: TROT, above: GALLOP
 
 # ── Control limits ────────────────────────────────────────────────────────────
 MAX_SPEED    = 6.0    # m/s  hard cap
-MAX_STEER    = 0.45   # rad  max cart steer angle
 MAX_SHOULDER = 0.20   # rad  max hip Z-yaw from IK
-MAX_STEP     = 0.55   # m    hard cap on stride half-length (deer stride is large)
+MAX_STEP     = 0.55   # m    hard cap on stride half-length
+
+# Minimum stride half-length per gait: steps stay large even at slow pace.
+# Speed controls cadence (how often steps happen), not step size.
+WALK_MIN_STRIDE   = 0.25  # m   50 cm full stride minimum at walk
+TROT_MIN_STRIDE   = 0.35  # m   70 cm full stride minimum at trot
+GALLOP_MIN_STRIDE = 0.50  # m  100 cm full stride minimum at gallop
+
+# Pitch-adaptive step height: lx * sin(pitch) * this scale added to each leg.
+# Front legs (lx>0): lean forward → step HIGHER. Rear (lx<0): lean forward → lower.
+PITCH_STEP_SCALE = 1.2
+
+# Balance correction: lean forward → shift all foot targets backward by this gain.
+# Helps CoM stay over support polygon during gait.
+BALANCE_FOOT_GAIN = 0.25   # m shift per rad of lean
+
+# Minimum step height so rear legs never drop to zero clearance.
+MIN_STEP_HEIGHT = 0.04    # m
 
 CONTACT_EFFORT_THRESHOLD = 45.0
 CONTACT_MIN_SWING_FRAC   = 0.45
 
-# ── Joint order (17 joints) ───────────────────────────────────────────────────
+# ── Joint order (16 joints — no cart steer) ──────────────────────────────────
 JOINT_ORDER = [
-    'cart_to_shaft_steer',
     'fl_hip_joint', 'fl_thigh_joint', 'fl_knee_joint', 'fl_cannon_joint',
     'fr_hip_joint', 'fr_thigh_joint', 'fr_knee_joint', 'fr_cannon_joint',
     'rl_hip_joint', 'rl_thigh_joint', 'rl_knee_joint', 'rl_cannon_joint',
     'rr_hip_joint', 'rr_thigh_joint', 'rr_knee_joint', 'rr_cannon_joint',
 ]
-N_JOINTS  = len(JOINT_ORDER)   # 17
+N_JOINTS  = len(JOINT_ORDER)   # 16
 LEG_ORDER = ('fl', 'fr', 'rl', 'rr')
 
 
@@ -216,30 +233,45 @@ def _elk_swing(p: float, fx_mean: float, fy_mean: float,
 def _pitch_compensated_step_height(leg: str, shaft_pitch: float,
                                    base_step_height: float) -> float:
     """
-    World-frame ground clearance guarantee:
-      When the body pitches forward (positive shaft_pitch), front legs
-      (lx > 0) need extra lift to clear the ground. Adds lx * sin(pitch)
-      so the foot stays above the ground plane regardless of body tilt.
+    Bidirectional pitch-adaptive step height.
+      - Body pitches FORWARD (positive pitch): front legs step HIGHER, rear LOWER.
+      - Body pitches BACKWARD (negative pitch): rear legs step HIGHER, front LOWER.
+    Uses: extra = lx * sin(pitch) * PITCH_STEP_SCALE
+      Front (lx=+0.55): forward lean → positive extra → more lift
+      Rear  (lx=-0.55): forward lean → negative extra → less lift
+    Clamped to MIN_STEP_HEIGHT so rear legs always retain some clearance.
     """
-    lx = LEG_POS[leg][0]
-    extra = max(0.0, lx * math.sin(shaft_pitch))
-    return base_step_height + extra
+    lx    = LEG_POS[leg][0]
+    extra = lx * math.sin(shaft_pitch) * PITCH_STEP_SCALE
+    return max(MIN_STEP_HEIGHT, base_step_height + extra)
 
 
 # ── Arc-following foot target (Raibert) ──────────────────────────────────────
 
 def _foot_target_3d(leg: str, phase: float, linear_v: float, angular_v: float,
-                    ankle_height: float, gait: dict, step_height: float):
+                    ankle_height: float, gait: dict, step_height: float,
+                    balance_offset: float = 0.0):
     """
     Raibert arc-following foot placement with 3-phase swing arc.
-    step_height is already pitch-compensated (call _pitch_compensated_step_height first).
+      step_height    : pitch-adapted step height for this leg.
+      balance_offset : extra fx shift for body lean correction (negative = push back).
+    Minimum stride enforced: steps stay large at slow pace; cadence slows instead.
     """
     lx, ly   = LEG_POS[leg]
     T_stance = gait['period'] * (1.0 - gait['swing_frac'])
 
-    # Negated: positive linear_v = body moves away from cart
-    fx_mean  = -(linear_v  - angular_v * ly) * T_stance / 2.0
-    fy_mean  = (angular_v * lx)             * T_stance / 2.0
+    # Raibert: negative so positive linear_v = body moves away from cart
+    fx_speed = (linear_v - angular_v * ly) * T_stance / 2.0
+    fy_speed = (angular_v * lx)            * T_stance / 2.0
+
+    # Enforce minimum stride: slow walking = same size steps, just slower cadence
+    if abs(linear_v) > 0.05:
+        min_stride = gait.get('min_stride', 0.0)
+        if abs(fx_speed) < min_stride:
+            fx_speed = math.copysign(min_stride, fx_speed)
+
+    fx_mean = -fx_speed + balance_offset
+    fy_mean =  fy_speed
     fx_mean  = max(-MAX_STEP,       min(MAX_STEP,       fx_mean))
     fy_mean  = max(-MAX_STEP * 0.5, min(MAX_STEP * 0.5, fy_mean))
 
@@ -256,6 +288,22 @@ def _foot_target_3d(leg: str, phase: float, linear_v: float, angular_v: float,
         return fx, fy, fz
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _quaternion_to_pitch_roll(q):
+    """Extract (pitch, roll) from ROS2 quaternion (x,y,z,w).
+    Pitch = rotation about Y (positive = nose up in ROS ENU convention).
+    Roll  = rotation about X (positive = roll left).
+    """
+    x, y, z, w = q.x, q.y, q.z, q.w
+    sinp = 2.0 * (w * y - z * x)
+    pitch = math.asin(max(-1.0, min(1.0, sinp)))
+    sinr_cosp = 2.0 * (w * x + y * z)
+    cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
+    roll = math.atan2(sinr_cosp, cosr_cosp)
+    return pitch, roll
+
+
 # ── Main node ─────────────────────────────────────────────────────────────────
 
 class BlendspaceNode(Node):
@@ -267,15 +315,17 @@ class BlendspaceNode(Node):
             JointTrajectory, '/leg_controller/joint_trajectory', 10)
         self.create_subscription(Twist,      '/cmd_vel',      self._cmd_vel_cb,      10)
         self.create_subscription(JointState, '/joint_states', self._joint_states_cb, 10)
+        self.create_subscription(Imu,        '/imu/data',     self._imu_cb,          10)
 
         self._linear_x  = 0.0
         self._angular_z = 0.0
 
-        self._gait_idx  = 0          # start in WALK
+        self._gait_idx  = 0
         self._gait      = WALK.copy()
         self._phase     = 0.0
 
-        self._shaft_pitch   = 0.0
+        self._body_pitch    = 0.0   # rad — from IMU (positive = nose up)
+        self._body_roll     = 0.0   # rad — from IMU (positive = roll left)
         self._early_contact = {l: False for l in LEG_ORDER}
         self._knee_effort   = {l: 0.0   for l in LEG_ORDER}
 
@@ -283,18 +333,21 @@ class BlendspaceNode(Node):
             self._gait['period'] / 2.0, self._tick)
 
         self.get_logger().info('=' * 60)
-        self.get_logger().info('  Elk Blendspace v4  —  Red Deer 160cm, deer legs')
-        self.get_logger().info('  Speed thresholds: 0-1.5=WALK, 1.5-3.5=TROT, >3.5=GALLOP')
-        self.get_logger().info('  No backward movement. W ramps up, S ramps down.')
+        self.get_logger().info('  Elk Blendspace v5  —  No cart, IMU self-balance')
+        self.get_logger().info('  Bidirectional pitch-adaptive step heights')
+        self.get_logger().info('  Minimum stride enforced: large steps at slow pace')
+        self.get_logger().info('  Speed: 0-1.5=WALK  1.5-3.5=TROT  >3.5=GALLOP')
         self.get_logger().info('=' * 60)
 
     # ── Callbacks ──────────────────────────────────────────────────────────
 
     def _cmd_vel_cb(self, msg: Twist):
-        # Clamp to [0, MAX_SPEED]: no backward movement
         self._linear_x  = max(0.0, min(MAX_SPEED, msg.linear.x))
         self._angular_z = msg.angular.z
         self._auto_select_gait()
+
+    def _imu_cb(self, msg: Imu):
+        self._body_pitch, self._body_roll = _quaternion_to_pitch_roll(msg.orientation)
 
     def _auto_select_gait(self):
         v = self._linear_x
@@ -318,10 +371,8 @@ class BlendspaceNode(Node):
             self._gait['period'] / 2.0, self._tick)
 
     def _joint_states_cb(self, msg: JointState):
-        name_to_idx = {n: i for i, n in enumerate(msg.name)}
-        if 'shaft_to_horse' in name_to_idx:
-            self._shaft_pitch = msg.position[name_to_idx['shaft_to_horse']]
         if len(msg.effort) == len(msg.name):
+            name_to_idx = {n: i for i, n in enumerate(msg.name)}
             for leg in LEG_ORDER:
                 key = f'{leg}_knee_joint'
                 if key in name_to_idx:
@@ -337,26 +388,29 @@ class BlendspaceNode(Node):
             self._publish_idle()
             return
 
-        gait = self._gait
+        gait  = self._gait
+        pitch = self._body_pitch   # IMU: positive = nose up
+        roll  = self._body_roll    # IMU: positive = roll left
 
-        # Body leveling + pitch-compensated step heights per leg
-        pitch_adj = math.tan(self._shaft_pitch) * HALF_BODY_LENGTH
-        pitch_adj = max(-0.15, min(0.15, pitch_adj))
+        # Ankle height adjustment: pitched body → front legs reach deeper, rear less
+        # Using pitch directly (negative pitch = nose down = forward lean in most conventions)
+        pitch_adj = math.tan(-pitch) * HALF_BODY_LENGTH
+        pitch_adj = max(-0.20, min(0.20, pitch_adj))
         ankle_heights = {
             'fl': ANKLE_HEIGHT + pitch_adj,
             'fr': ANKLE_HEIGHT + pitch_adj,
             'rl': ANKLE_HEIGHT - pitch_adj,
             'rr': ANKLE_HEIGHT - pitch_adj,
         }
-        # Front legs need extra lift when body pitches forward so feet clear ground
+
+        # Bidirectional pitch-adaptive step heights
         step_heights = {
-            leg: _pitch_compensated_step_height(leg, self._shaft_pitch, gait['step_height'])
+            leg: _pitch_compensated_step_height(leg, -pitch, gait['step_height'])
             for leg in LEG_ORDER
         }
 
-        # Active cart steering
-        turn_norm   = max(-1.0, min(1.0, ang / 1.5))
-        steer_angle = turn_norm * MAX_STEER
+        # Balance correction: lean forward (negative pitch/nose down) → shift feet backward
+        balance_offset = pitch * BALANCE_FOOT_GAIN
 
         n_pts = 50
         dt    = gait['period'] / n_pts
@@ -366,13 +420,15 @@ class BlendspaceNode(Node):
 
         for i in range(n_pts):
             phase     = (self._phase + i / n_pts) % 1.0
-            positions = [steer_angle]
+            positions = []
 
             for leg in LEG_ORDER:
                 ank_h  = ankle_heights[leg]
                 eff_ph = self._adjusted_phase(leg, phase, gait)
 
-                fx, fy, fz = _foot_target_3d(leg, eff_ph, lin, ang, ank_h, gait, step_heights[leg])
+                fx, fy, fz = _foot_target_3d(
+                    leg, eff_ph, lin, ang, ank_h, gait,
+                    step_heights[leg], balance_offset)
 
                 if leg in FRONT_LEGS:
                     hip_z, thigh, knee, cannon = _ik_3d_front(fx, fy, fz)
@@ -416,22 +472,44 @@ class BlendspaceNode(Node):
             else:
                 self._early_contact[leg] = False
 
-    # ── Idle pose ───────────────────────────────────────────────────────
+    # ── Idle pose with IMU balance correction ───────────────────────────
 
     def _publish_idle(self):
-        turn_norm   = max(-1.0, min(1.0, self._angular_z / 1.5))
-        steer_angle = turn_norm * MAX_STEER
-        shoulder    = max(-0.08, min(0.08, turn_norm * 0.08))
+        # Turning: differential hip splay (no cart steer)
+        shoulder = max(-0.12, min(0.12, self._angular_z * 0.06))
+
+        # IMU balance: lean forward (nose down = negative pitch in ROS ENU) →
+        # rotate all thighs backward to shift support polygon forward under CoM.
+        # Gain of 0.3 rad/rad gives ~17 deg thigh correction per 1 rad lean.
+        pitch_corr = max(-0.20, min(0.20, -self._body_pitch * 0.30))
+
+        # Roll correction: lean left (positive roll) → left legs splay outward more
+        roll_corr  = max(-0.10, min(0.10,  self._body_roll  * 0.20))
+
+        fl_hip = shoulder + roll_corr
+        fr_hip = shoulder - roll_corr
+        rl_hip = shoulder + roll_corr
+        rr_hip = shoulder - roll_corr
+
+        fl_th = NEUTRAL_THIGH_FRONT + pitch_corr
+        fr_th = NEUTRAL_THIGH_FRONT + pitch_corr
+        rl_th = NEUTRAL_THIGH_REAR  + pitch_corr
+        rr_th = NEUTRAL_THIGH_REAR  + pitch_corr
+
+        # Recalculate cannon for adjusted thigh (pantograph)
+        fl_ca = CANNON_LEAN - (fl_th + NEUTRAL_KNEE_FRONT)
+        fr_ca = CANNON_LEAN - (fr_th + NEUTRAL_KNEE_FRONT)
+        rl_ca = CANNON_LEAN - (rl_th + NEUTRAL_KNEE_REAR)
+        rr_ca = CANNON_LEAN - (rr_th + NEUTRAL_KNEE_REAR)
 
         msg_out = JointTrajectory()
         msg_out.joint_names = JOINT_ORDER
         pt = JointTrajectoryPoint()
         pt.positions = [
-            steer_angle,
-            shoulder, NEUTRAL_THIGH_FRONT, NEUTRAL_KNEE_FRONT, NEUTRAL_CANNON_FRONT,
-            shoulder, NEUTRAL_THIGH_FRONT, NEUTRAL_KNEE_FRONT, NEUTRAL_CANNON_FRONT,
-            shoulder, NEUTRAL_THIGH_REAR,  NEUTRAL_KNEE_REAR,  NEUTRAL_CANNON_REAR,
-            shoulder, NEUTRAL_THIGH_REAR,  NEUTRAL_KNEE_REAR,  NEUTRAL_CANNON_REAR,
+            fl_hip, fl_th, NEUTRAL_KNEE_FRONT, fl_ca,
+            fr_hip, fr_th, NEUTRAL_KNEE_FRONT, fr_ca,
+            rl_hip, rl_th, NEUTRAL_KNEE_REAR,  rl_ca,
+            rr_hip, rr_th, NEUTRAL_KNEE_REAR,  rr_ca,
         ]
         pt.velocities      = [0.0] * N_JOINTS
         pt.time_from_start = Duration(sec=0, nanosec=200_000_000)

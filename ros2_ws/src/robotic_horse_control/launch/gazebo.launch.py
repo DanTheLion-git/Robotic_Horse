@@ -68,22 +68,27 @@ def generate_launch_description():
     )
 
     # ── Spawn the robot into Gazebo ───────────────────────────────────
+    # base_link is now the root. Spawn at z=1.50 m (hip height + 5cm clearance).
+    # With neutral leg angles, feet just touch the ground at z=1.45m.
     spawn_robot = Node(
         package='ros_gz_sim',
         executable='create',
         arguments=[
             '-name', 'robotic_horse',
             '-topic', 'robot_description',
-            '-x', '-2.5', '-y', '0.0', '-z', '0.55',
+            '-x', '0.0', '-y', '0.0', '-z', '1.55',
         ],
         output='screen',
     )
 
-    # ── Bridge gz clock → ROS2 /clock ────────────────────────────────
+    # ── Bridge gz clock + IMU → ROS2 ─────────────────────────────────
     gz_bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
-        arguments=['/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock'],
+        arguments=[
+            '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
+            '/imu/data@sensor_msgs/msg/Imu[gz.msgs.IMU',
+        ],
         output='screen',
     )
 
