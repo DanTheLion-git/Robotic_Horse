@@ -1,1 +1,77 @@
-/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/animations/blendspace.yaml
+# blendspace.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+# Defines the 2D locomotion blendspace for the Robotic Horse.
+#
+# Axes
+# ────
+#   X — forward_speed      [0.0 … 1.0]
+#         0 = standing still      1 = full speed ahead
+#   Y — angular_rate       [-1.0 … 1.0]
+#        -1 = full turn left       0 = straight     +1 = full turn right
+#
+# Visualisation of the blendspace grid:
+#
+#          angular_rate
+#   -1          0          +1
+#    │           │           │
+#    ●──────────●──────────●  ← speed = 1.0
+#  walk_left  walk_fwd  walk_right
+#    │           │           │
+#    ●──────────●──────────●  ← speed = 0.0
+#  turn_left   idle    turn_right
+#
+# The blendspace_node.py bilinearly interpolates between the 4 surrounding
+# anchor points based on the current (forward_speed, angular_rate) command.
+#
+# How to add a new animation:
+#   1. Create and export the animation from Blender (see blender/INSTRUCTIONS.md)
+#   2. Place the .json file in this animations/ folder
+#   3. Add a new entry below with its (x, y) coordinates
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: "locomotion_blendspace"
+
+axes:
+  x:
+    label: "forward_speed"
+    min: 0.0
+    max: 1.0
+  y:
+    label: "angular_rate"
+    min: -1.0
+    max: 1.0
+
+# ── Anchor animations ──────────────────────────────────────────────────────
+# Each entry places one animation at a (x, y) coordinate in the blendspace.
+# The blendspace_node interpolates between them at runtime.
+animations:
+
+  - file: "idle.json"
+    x: 0.0
+    y: 0.0
+    description: "Standing still — subtle weight-shift bob"
+
+  - file: "walk_forward.json"
+    x: 1.0
+    y: 0.0
+    description: "Trot gait straight ahead at full speed"
+
+  - file: "walk_left.json"
+    x: 1.0
+    y: -1.0
+    description: "Arc-left trot (left legs shorter stride, right legs longer)"
+
+  - file: "walk_right.json"
+    x: 1.0
+    y: 1.0
+    description: "Arc-right trot (right legs shorter stride, left legs longer)"
+
+  - file: "turn_left.json"
+    x: 0.0
+    y: -1.0
+    description: "Spin in place to the left"
+
+  - file: "turn_right.json"
+    x: 0.0
+    y: 1.0
+    description: "Spin in place to the right"

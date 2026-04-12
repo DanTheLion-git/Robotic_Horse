@@ -73,12 +73,13 @@
   <!-- ═══════════════════════════════════════════════════════
        BASE LINK
   ═══════════════════════════════════════════════════════ -->
-  <!-- Highland Cow body: 400kg, 1.40x0.60x0.40m. Low CoM for stability. -->
+  <!-- Body mass ~100 kg: motors(48)+frame(24)+electronics(8)+decoration(35)+legs(5).
+       Inertia (100 kg, 1.40x0.60x0.40 m box): Ixx=4.33, Iyy=17.67, Izz=19.33 kg·m² -->
   <link name="base_link">
     <inertial>
-      <mass value="400.0"/>
+      <mass value="100.0"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="17.33" iyy="70.67" izz="77.33" ixy="0" ixz="0" iyz="0"/>
+      <inertia ixx="4.33" iyy="17.67" izz="19.33" ixy="0" ixz="0" iyz="0"/>
     </inertial>
     <!-- Main body panel -->
     <visual>
@@ -660,7 +661,7 @@
         <param name="min">-1.8</param><param name="max">1.8</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">0.25</param>
+        <param name="initial_value">0.55</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -670,7 +671,7 @@
         <param name="min">-1.8</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">-0.55</param>
+        <param name="initial_value">-1.10</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -680,7 +681,7 @@
         <param name="min">-2.0</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">0.38</param>
+        <param name="initial_value">0.63</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -702,7 +703,7 @@
         <param name="min">-1.8</param><param name="max">1.8</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">0.25</param>
+        <param name="initial_value">0.55</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -712,7 +713,7 @@
         <param name="min">-1.8</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">-0.55</param>
+        <param name="initial_value">-1.10</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -722,7 +723,7 @@
         <param name="min">-2.0</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">0.38</param>
+        <param name="initial_value">0.63</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -744,7 +745,7 @@
         <param name="min">-1.8</param><param name="max">1.8</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">-0.25</param>
+        <param name="initial_value">-0.55</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -754,7 +755,7 @@
         <param name="min">-1.8</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">0.55</param>
+        <param name="initial_value">1.10</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -764,7 +765,7 @@
         <param name="min">-2.0</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">-0.22</param>
+        <param name="initial_value">-0.47</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -786,7 +787,7 @@
         <param name="min">-1.8</param><param name="max">1.8</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">-0.25</param>
+        <param name="initial_value">-0.55</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -796,7 +797,7 @@
         <param name="min">-1.8</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">0.55</param>
+        <param name="initial_value">1.10</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -806,7 +807,7 @@
         <param name="min">-2.0</param><param name="max">2.0</param>
       </command_interface>
       <state_interface name="position">
-        <param name="initial_value">-0.22</param>
+        <param name="initial_value">-0.47</param>
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>

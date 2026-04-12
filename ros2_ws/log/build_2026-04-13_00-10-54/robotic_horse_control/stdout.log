@@ -1,0 +1,29 @@
+running egg_info
+writing ../../build/robotic_horse_control/robotic_horse_control.egg-info/PKG-INFO
+writing dependency_links to ../../build/robotic_horse_control/robotic_horse_control.egg-info/dependency_links.txt
+writing entry points to ../../build/robotic_horse_control/robotic_horse_control.egg-info/entry_points.txt
+writing requirements to ../../build/robotic_horse_control/robotic_horse_control.egg-info/requires.txt
+writing top-level names to ../../build/robotic_horse_control/robotic_horse_control.egg-info/top_level.txt
+reading manifest file '../../build/robotic_horse_control/robotic_horse_control.egg-info/SOURCES.txt'
+writing manifest file '../../build/robotic_horse_control/robotic_horse_control.egg-info/SOURCES.txt'
+running build
+running build_py
+copying robotic_horse_control/blendspace_node.py -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/build/lib/robotic_horse_control
+copying robotic_horse_control/teleop_key.py -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/build/lib/robotic_horse_control
+running install
+running install_lib
+copying /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/build/lib/robotic_horse_control/blendspace_node.py -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/python3.12/site-packages/robotic_horse_control
+copying /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/build/lib/robotic_horse_control/teleop_key.py -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/python3.12/site-packages/robotic_horse_control
+byte-compiling /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/python3.12/site-packages/robotic_horse_control/blendspace_node.py to blendspace_node.cpython-312.pyc
+byte-compiling /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/python3.12/site-packages/robotic_horse_control/teleop_key.py to teleop_key.cpython-312.pyc
+running install_data
+copying launch/gazebo.launch.py -> /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/share/robotic_horse_control/launch
+running install_egg_info
+removing '/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/python3.12/site-packages/robotic_horse_control-0.1.0-py3.12.egg-info' (and everything under it)
+Copying ../../build/robotic_horse_control/robotic_horse_control.egg-info to /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/python3.12/site-packages/robotic_horse_control-0.1.0-py3.12.egg-info
+running install_scripts
+Installing blendspace_node script to /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/robotic_horse_control
+Installing force_node script to /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/robotic_horse_control
+Installing gait_node script to /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/robotic_horse_control
+Installing teleop_key script to /home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/install/robotic_horse_control/lib/robotic_horse_control
+writing list of installed files to '/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_control/install.log'
