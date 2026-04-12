@@ -68,15 +68,17 @@ def generate_launch_description():
     )
 
     # ── Spawn the robot into Gazebo ───────────────────────────────────
-    # base_link is now the root. Spawn at z=1.33m (body_center 1.27m + 6cm clearance).
-    # With neutral leg angles (56-deg knee), feet just touch the ground at z=1.27m.
+    # cart_base is the ROOT link. Spawn at x=-4.4m (behind horse), z=0.90m
+    # (5cm above settled height so wheels don't tunnel into ground on spawn).
+    # When settled: wheels at z=0.5m, cart body center z=0.85m, horse body z=1.27m.
+    # Horse center is at world (0,0,1.27) after joint chain: cart→shaft→collar→horse.
     spawn_robot = Node(
         package='ros_gz_sim',
         executable='create',
         arguments=[
             '-name', 'robotic_horse',
             '-topic', 'robot_description',
-            '-x', '0.0', '-y', '0.0', '-z', '1.33',
+            '-x', '-4.4', '-y', '0.0', '-z', '0.90',
         ],
         output='screen',
     )
