@@ -70,7 +70,7 @@ NEUTRAL_CANNON_REAR  = -0.355   # CANNON_LEAN - (-0.476 + 0.981) = 0.15 - 0.505 
 WALK = dict(
     phase_offsets={'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
     swing_frac=0.22,
-    step_height=0.08,   # base foot clearance — pitch compensation adds on top
+    step_height=0.20,   # base foot clearance — pitch compensation adds on top
     min_stride=0.25,    # m — large step even at slow pace (50 cm full stride)
     period=1.6,
     name='WALK',
@@ -79,7 +79,7 @@ WALK = dict(
 TROT = dict(
     phase_offsets={'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0},
     swing_frac=0.32,
-    step_height=0.14,
+    step_height=0.35,
     min_stride=0.35,
     period=0.90,
     name='TROT',
@@ -88,7 +88,7 @@ TROT = dict(
 GALLOP = dict(
     phase_offsets={'fl': 0.0, 'rl': 0.15, 'fr': 0.50, 'rr': 0.65},
     swing_frac=0.42,
-    step_height=0.22,
+    step_height=0.55,
     min_stride=0.50,
     period=0.50,
     name='GALLOP',
@@ -120,7 +120,7 @@ PITCH_STEP_SCALE = 1.2
 BALANCE_FOOT_GAIN = 0.25   # m shift per rad of lean
 
 # Minimum step height so rear legs never drop to zero clearance.
-MIN_STEP_HEIGHT = 0.04    # m
+MIN_STEP_HEIGHT = 0.10    # m
 
 CONTACT_EFFORT_THRESHOLD = 45.0
 CONTACT_MIN_SWING_FRAC   = 0.45
