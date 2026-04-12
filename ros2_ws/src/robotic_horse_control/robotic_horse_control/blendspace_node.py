@@ -185,8 +185,8 @@ def _foot_target_3d(leg: str, phase: float, linear_v: float, angular_v: float,
     lx, ly   = LEG_POS[leg]
     T_stance = gait['period'] * (1.0 - gait['swing_frac'])
 
-    # Standard Raibert: positive linear_v = foot placed forward = body moves forward
-    fx_mean  = (linear_v  - angular_v * ly) * T_stance / 2.0
+    # Negated: positive linear_v = body moves away from cart
+    fx_mean  = -(linear_v  - angular_v * ly) * T_stance / 2.0
     fy_mean  = (angular_v * lx)             * T_stance / 2.0
     fx_mean  = max(-MAX_STEP,       min(MAX_STEP,       fx_mean))
     fy_mean  = max(-MAX_STEP * 0.5, min(MAX_STEP * 0.5, fy_mean))
