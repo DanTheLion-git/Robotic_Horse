@@ -1,37 +1,36 @@
 """
-blendspace_node.py  —  Elk-accurate velocity-driven gait controller.
+blendspace_node.py  —  Elk-accurate velocity-driven gait controller (v3).
 
-Elk (Cervus canadensis) gait characteristics implemented:
-  WALK  — 4-beat lateral sequence (RL→FL→RR→FR), period 1.6 s
-           Duty factor 65%: 3 feet always on ground, very stable
-  TROT  — Diagonal pairs with suspension phase, period 0.90 s
-           Elk trot has a brief airborne moment; duty factor ~50%
-  GALLOP— Rotary gallop (hind legs reach ahead of fore legs), period 0.50 s
+Deer/elk leg anatomy (3-segment):
+  thigh (femur/humerus, 0.38m)
+  → knee (stifle/carpus, 0.38m shank)
+  → cannon bone (metatarsal/metacarpal, 0.22m)  ← NEW
+  → hoof
 
-Step profile:
-  All gaits use an elk-inspired swing arc:
-    - Height peaks at 40% of swing (sin^0.7 profile → early, sustained lift)
-    - Forward extension is slightly delayed (p^1.3) — leg lifts THEN swings
-  This mimics the characteristic high-stepping elk walk and elastic trot.
+Leg configuration:
+  FRONT (FL/FR): elbow-DOWN — carpal ("wrist") bends FORWARD (away from cart)
+                 Neutral: thigh=+0.564, knee=-1.127, cannon=+0.714
+  REAR  (RL/RR): elbow-UP   — hock bends BACKWARD  (toward cart)
+                 Neutral: thigh=-0.564, knee=+1.127, cannon=-0.414
 
-Physics improvements (anti-bounce):
-  - Robot body mass increased to 28 kg (62 kg total) — see URDF
-  - Leg joint damping increased — see URDF
-  - PID gains scaled proportionally — see ros2_control.yaml
+Cannon bone (pantograph principle):
+  A 4-bar linkage keeps the cannon near-vertical regardless of leg pose.
+  Simulated as: cannon_angle = CANNON_LEAN - (thigh + knee)
+  This is how red deer check-ligaments work biologically — zero extra motors.
 
-5 core improvements (from previous session) retained:
-  1. 3D IK          — hip Z-yaw for arc-correct lateral foot placement
-  2. Raibert placement — per-leg stride = arc velocity × T_stance / 2
-  3. Active steering — cart_to_shaft_steer commanded joint
-  4. Body leveling   — shaft_to_horse pitch adjusts front/rear height
-  5. Contact detect  — knee effort spike → early stance
+Elk gaits (retained from v2):
+  WALK   — 4-beat lateral sequence RL→FL→RR→FR, period 1.6 s
+  TROT   — Diagonal pairs with suspension phase, period 0.90 s
+  GALLOP — Rotary gallop FL→RL→FR→RR, period 0.50 s
+
+Elk step profile (retained from v2):
+  Height: sin(pi * p^0.7) — peaks at 40% of swing, broad sustained lift
+  Forward: p^1.3          — leg lifts THEN swings forward
 
 Topics:
-  /cmd_vel     geometry_msgs/Twist  — linear.x=speed, angular.z=turn
-  /cmd_gait    std_msgs/String      — "walk" | "trot" | "gallop"
+  /cmd_vel   geometry_msgs/Twist   — linear.x=speed, angular.z=turn
+  /cmd_gait  std_msgs/String       — "walk" | "trot" | "gallop"
   /joint_states sensor_msgs/JointState
-
-Keys (via teleop_key): W/S=fwd/bwd  A/D=turn  Q=cycle gait  SPACE=stop
 """
 
 import math
@@ -45,8 +44,15 @@ from builtin_interfaces.msg import Duration
 
 
 # ── Robot geometry (must match URDF) ─────────────────────────────────────────
-L1 = 0.45          # thigh length  [m]
-L2 = 0.50          # shank length  [m]
+L1 = 0.38           # thigh length        [m]
+L2 = 0.38           # shank length        [m]
+L3 = 0.22           # cannon bone length  [m]
+CANNON_LEAN = 0.15  # cannon forward lean from vertical [rad] (~8.6 deg)
+FOOT_R = 0.04       # foot sphere radius  [m]
+
+# ANKLE_HEIGHT = hip-to-ankle drop (IK targets ankle, not foot sphere)
+ANKLE_HEIGHT = 0.90 - L3 * math.cos(CANNON_LEAN) - FOOT_R  # = 0.6425m
+BODY_HEIGHT  = 0.90     # hip-to-ground height [m]
 
 # Hip pivot positions relative to base_link (x=fwd, y=left, z=up)
 LEG_POS = {
@@ -57,162 +63,170 @@ LEG_POS = {
 }
 HALF_BODY_LENGTH = 0.35
 
-# ── Elk gait parameters ───────────────────────────────────────────────────────
-# Neutral stance pose (Spot-like elbow-up, verified by IK)
-BODY_HEIGHT   = 0.90
-NEUTRAL_THIGH = -0.344
-NEUTRAL_KNEE  =  0.651
+FRONT_LEGS = ('fl', 'fr')
+REAR_LEGS  = ('rl', 'rr')
 
-# ─── WALK — 4-beat lateral sequence ────────────────────────────────────────
-# Footfall order:  RL(0.0) → FL(0.25) → RR(0.50) → FR(0.75)
-# At any instant: 3 feet on ground (3-point support), very stable.
-# Elk walk: deliberate, high knee lift, long stride, head bobs gently.
+# ── Neutral poses (verified by forward kinematics — foot at ground) ───────────
+NEUTRAL_THIGH_FRONT  = +0.564
+NEUTRAL_KNEE_FRONT   = -1.127
+NEUTRAL_CANNON_FRONT = +0.714   # = CANNON_LEAN - (0.564 + -1.127) = 0.563
+
+NEUTRAL_THIGH_REAR   = -0.564
+NEUTRAL_KNEE_REAR    = +1.127
+NEUTRAL_CANNON_REAR  = -0.414   # = CANNON_LEAN - (-0.564 + 1.127) = -0.413
+
+# ── Elk gait parameters ───────────────────────────────────────────────────────
+
 WALK = dict(
     phase_offsets={'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
-    swing_frac=0.35,    # 65% stance  → 3 feet always down
-    step_height=0.12,   # moderate lift at walk
-    period=1.6,         # slow cadence; increase SPEED in teleop for realistic pace
+    swing_frac=0.35,
+    step_height=0.12,
+    period=1.6,
     name='WALK',
 )
 
-# ─── TROT — diagonal pairs with brief suspension ────────────────────────────
-# FL+RR move together, FR+RL move together.
-# Elk trot: energetic, elastic, higher lift than walk, brief airborne phase.
 TROT = dict(
     phase_offsets={'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0},
-    swing_frac=0.50,    # equal swing/stance → suspension phase emerges
-    step_height=0.17,   # noticeable lift — elk trot is showy
-    period=0.90,        # faster cadence
+    swing_frac=0.50,
+    step_height=0.17,
+    period=0.90,
     name='TROT',
 )
 
-# ─── GALLOP — rotary gallop (elk/deer signature) ────────────────────────────
-# Hind legs reach far ahead of fore legs between bounds.
-# Left-lead rotary sequence: FL → RL → FR → RR
-# The hindquarters "reach through" for powerful propulsion.
 GALLOP = dict(
     phase_offsets={'fl': 0.0, 'rl': 0.15, 'fr': 0.50, 'rr': 0.65},
-    swing_frac=0.55,    # more time airborne per leg in gallop
-    step_height=0.22,   # large bounding strides
-    period=0.50,        # fast cadence
+    swing_frac=0.55,
+    step_height=0.22,
+    period=0.50,
     name='GALLOP',
 )
 
-GAIT_SEQUENCE = [WALK, TROT, GALLOP]   # Q cycles through this list
+GAIT_SEQUENCE = [WALK, TROT, GALLOP]
 
 # ── Control limits ────────────────────────────────────────────────────────────
-MAX_STEER    = 0.45   # max cart steer angle [rad] (~26 deg)
-MAX_SHOULDER = 0.20   # max hip yaw from 3D IK [rad]
-MAX_STEP     = 0.30   # hard cap on stride half-width [m]
+MAX_STEER    = 0.45   # max cart steer angle  [rad]
+MAX_SHOULDER = 0.20   # max hip Z-yaw from IK [rad]
+MAX_STEP     = 0.30   # hard cap on stride half-length [m]
 
 CONTACT_EFFORT_THRESHOLD = 45.0
 CONTACT_MIN_SWING_FRAC   = 0.45
 
-# ── Joint order (13 joints) ───────────────────────────────────────────────────
+# ── Joint order (17 joints) ───────────────────────────────────────────────────
 JOINT_ORDER = [
     'cart_to_shaft_steer',
-    'fl_hip_joint', 'fl_thigh_joint', 'fl_knee_joint',
-    'fr_hip_joint', 'fr_thigh_joint', 'fr_knee_joint',
-    'rl_hip_joint', 'rl_thigh_joint', 'rl_knee_joint',
-    'rr_hip_joint', 'rr_thigh_joint', 'rr_knee_joint',
+    'fl_hip_joint', 'fl_thigh_joint', 'fl_knee_joint', 'fl_cannon_joint',
+    'fr_hip_joint', 'fr_thigh_joint', 'fr_knee_joint', 'fr_cannon_joint',
+    'rl_hip_joint', 'rl_thigh_joint', 'rl_knee_joint', 'rl_cannon_joint',
+    'rr_hip_joint', 'rr_thigh_joint', 'rr_knee_joint', 'rr_cannon_joint',
 ]
-N_JOINTS  = len(JOINT_ORDER)
+N_JOINTS  = len(JOINT_ORDER)   # 17
 LEG_ORDER = ('fl', 'fr', 'rl', 'rr')
 
 
-# ── 3D IK ─────────────────────────────────────────────────────────────────────
+# ── 3D IK — front legs (elbow-DOWN, carpal bends away from cart) ──────────────
 
-def _ik_3d(fx: float, fy: float, fz: float):
+def _ik_3d_front(fx: float, fy: float, fz: float):
     """
-    Elbow-up 3D IK: hip-Z yaw to follow lateral foot offset,
-    then 2D elbow-up IK in the rotated plane.
-    Returns (hip_z, thigh_y, knee_y).
+    Front-leg IK: carpal (wrist) bends FORWARD, away from cart.
+    knee < 0, thigh > 0.
+    Returns (hip_z, thigh_y, knee_y, cannon_y).
     """
     reach = math.sqrt(fx**2 + fz**2)
     hip_z = math.atan2(fy, reach) if reach > 0.001 else 0.0
     hip_z = max(-MAX_SHOULDER, min(MAX_SHOULDER, hip_z))
 
-    cos_h  = math.cos(hip_z)
-    sin_h  = math.sin(hip_z)
-    fx_2d  = fx * cos_h + fy * sin_h
-    fz_2d  = fz
+    fx_2d = fx * math.cos(hip_z) + fy * math.sin(hip_z)
+    fz_2d = fz   # vertical component unchanged
 
-    r      = math.sqrt(fx_2d**2 + fz_2d**2)
-    r      = max(abs(L1 - L2) + 0.001, min(r, L1 + L2 - 0.001))
-    cos_k  = (r**2 - L1**2 - L2**2) / (2 * L1 * L2)
-    cos_k  = max(-1.0, min(1.0, cos_k))
-    knee   = +math.acos(cos_k)
+    r     = math.sqrt(fx_2d**2 + fz_2d**2)
+    r     = max(abs(L1 - L2) + 0.001, min(r, L1 + L2 - 0.001))
+    cos_k = (r**2 - L1**2 - L2**2) / (2.0 * L1 * L2)
+    cos_k = max(-1.0, min(1.0, cos_k))
+
+    knee   = -math.acos(cos_k)          # negative = elbow-DOWN
+    alpha  = math.atan2(fx_2d, -fz_2d)
+    beta   = math.asin(max(-1.0, min(1.0, L2 * math.sin(abs(knee)) / r)))
+    thigh  = alpha + beta               # positive = leans forward
+
+    cannon = CANNON_LEAN - (thigh + knee)
+    cannon = max(-2.0, min(2.0, cannon))
+    return hip_z, thigh, knee, cannon
+
+
+# ── 3D IK — rear legs (elbow-UP, hock bends toward cart) ─────────────────────
+
+def _ik_3d_rear(fx: float, fy: float, fz: float):
+    """
+    Rear-leg IK: hock bends BACKWARD, toward cart.
+    knee > 0, thigh < 0.
+    Returns (hip_z, thigh_y, knee_y, cannon_y).
+    """
+    reach = math.sqrt(fx**2 + fz**2)
+    hip_z = math.atan2(fy, reach) if reach > 0.001 else 0.0
+    hip_z = max(-MAX_SHOULDER, min(MAX_SHOULDER, hip_z))
+
+    fx_2d = fx * math.cos(hip_z) + fy * math.sin(hip_z)
+    fz_2d = fz
+
+    r     = math.sqrt(fx_2d**2 + fz_2d**2)
+    r     = max(abs(L1 - L2) + 0.001, min(r, L1 + L2 - 0.001))
+    cos_k = (r**2 - L1**2 - L2**2) / (2.0 * L1 * L2)
+    cos_k = max(-1.0, min(1.0, cos_k))
+
+    knee   = +math.acos(cos_k)          # positive = elbow-UP (hock-back)
     alpha  = math.atan2(fx_2d, -fz_2d)
     beta   = math.asin(max(-1.0, min(1.0, L2 * math.sin(knee) / r)))
-    thigh  = alpha - beta
+    thigh  = alpha - beta               # negative = leans backward
 
-    return hip_z, thigh, knee
+    cannon = CANNON_LEAN - (thigh + knee)
+    cannon = max(-2.0, min(2.0, cannon))
+    return hip_z, thigh, knee, cannon
 
 
 # ── Elk-specific swing profile ────────────────────────────────────────────────
 
 def _elk_swing(p: float, fx_mean: float, fy_mean: float,
-               body_height: float, step_height: float):
+               ankle_height: float, step_height: float):
     """
-    Elk-inspired swing trajectory for swing-phase fraction p ∈ [0, 1).
-
-    Characteristics:
-      - Height peaks early (~40% into swing) using sin(π·p^0.7)
-        The exponent <1 shifts the sine peak earlier, giving a broad plateau
-        at full lift — the leg "dwells" high before reaching forward.
-      - Forward extension is slightly delayed: p^1.3
-        This means the leg lifts UP before it swings FORWARD — exactly what
-        you see in slow-motion elk and horse video footage.
-
-    Returns (fx, fy, fz) in hip frame.
+    Elk-inspired swing arc: sin(pi*p^0.7) height, p^1.3 forward swing.
+    Height peaks at 40% of swing; forward reach is delayed (lift first).
+    Targets the ANKLE position (IK handles cannon+foot below that).
     """
-    # Elk-style height: broad, early peak
     lift = step_height * math.sin(math.pi * (p ** 0.7))
-
-    # Elk-style forward swing: delayed (lift first, reach later)
-    t = p ** 1.3
-    fx = -fx_mean + 2.0 * fx_mean * t
-    fy = -fy_mean + 2.0 * fy_mean * t
-    fz = -(body_height - lift)
-
+    t    = p ** 1.3
+    fx   = -fx_mean + 2.0 * fx_mean * t
+    fy   = -fy_mean + 2.0 * fy_mean * t
+    fz   = -(ankle_height - lift)
     return fx, fy, fz
 
 
 # ── Arc-following foot target ─────────────────────────────────────────────────
 
 def _foot_target_3d(leg: str, phase: float, linear_v: float, angular_v: float,
-                    body_height: float, gait: dict):
+                    ankle_height: float, gait: dict):
     """
-    Raibert-inspired arc-following foot target.
-
-    For a leg at (lx, ly) from the body centre moving at (vx, ω):
-        v_hip_x = vx - ω·ly    (inner legs travel shorter arc)
-        v_hip_y = ω·lx         (lateral arc sweep)
-
-    Step half-length = v_hip × T_stance / 2
-    Produces differential stride automatically for any turn radius.
-
-    Returns (fx, fy, fz) in hip frame.
+    Raibert arc-following foot target.
+    stride_half = leg_arc_velocity × T_stance / 2
+    Returns (fx, fy, fz) in hip frame, targeting the ANKLE.
     """
-    lx, ly = LEG_POS[leg]
+    lx, ly   = LEG_POS[leg]
     T_stance = gait['period'] * (1.0 - gait['swing_frac'])
 
-    fx_mean = (linear_v  - angular_v * ly) * T_stance / 2.0
-    fy_mean = (angular_v * lx)             * T_stance / 2.0
+    fx_mean  = (linear_v  - angular_v * ly) * T_stance / 2.0
+    fy_mean  = (angular_v * lx)             * T_stance / 2.0
+    fx_mean  = max(-MAX_STEP,       min(MAX_STEP,       fx_mean))
+    fy_mean  = max(-MAX_STEP * 0.5, min(MAX_STEP * 0.5, fy_mean))
 
-    fx_mean = max(-MAX_STEP,       min(MAX_STEP,       fx_mean))
-    fy_mean = max(-MAX_STEP * 0.5, min(MAX_STEP * 0.5, fy_mean))
-
-    local = (phase - gait['phase_offsets'][leg]) % 1.0
+    local    = (phase - gait['phase_offsets'][leg]) % 1.0
 
     if local < gait['swing_frac']:
         p = local / gait['swing_frac']
-        return _elk_swing(p, fx_mean, fy_mean, body_height, gait['step_height'])
+        return _elk_swing(p, fx_mean, fy_mean, ankle_height, gait['step_height'])
     else:
         p  = (local - gait['swing_frac']) / (1.0 - gait['swing_frac'])
-        fx = fx_mean  * (1.0 - 2.0 * p)
-        fy = fy_mean  * (1.0 - 2.0 * p)
-        fz = -body_height
+        fx = fx_mean * (1.0 - 2.0 * p)
+        fy = fy_mean * (1.0 - 2.0 * p)
+        fz = -ankle_height
         return fx, fy, fz
 
 
@@ -225,33 +239,31 @@ class BlendspaceNode(Node):
 
         self._pub = self.create_publisher(
             JointTrajectory, '/leg_controller/joint_trajectory', 10)
-        self.create_subscription(Twist,      '/cmd_vel',      self._cmd_vel_cb,  10)
-        self.create_subscription(String,     '/cmd_gait',     self._gait_cb,     10)
+        self.create_subscription(Twist,      '/cmd_vel',      self._cmd_vel_cb,      10)
+        self.create_subscription(String,     '/cmd_gait',     self._gait_cb,         10)
         self.create_subscription(JointState, '/joint_states', self._joint_states_cb, 10)
 
         self._linear_x  = 0.0
         self._angular_z = 0.0
 
-        self._gait_idx  = 1            # start in TROT
+        self._gait_idx  = 1          # start in TROT
         self._gait      = TROT.copy()
         self._phase     = 0.0
 
-        # Body leveling
-        self._shaft_pitch = 0.0
-
-        # Contact detection
+        self._shaft_pitch   = 0.0
         self._early_contact = {l: False for l in LEG_ORDER}
         self._knee_effort   = {l: 0.0   for l in LEG_ORDER}
 
         self._gait_timer = self.create_timer(
             self._gait['period'] / 2.0, self._tick)
 
-        self.get_logger().info('=' * 58)
-        self.get_logger().info('  Elk Blendspace — gaits: WALK / TROT / GALLOP')
-        self.get_logger().info('  /cmd_vel: linear.x=fwd  angular.z=turn')
-        self.get_logger().info('  /cmd_gait: "walk" | "trot" | "gallop"')
-        self.get_logger().info('  Q key cycles gaits, SPACE stops')
-        self.get_logger().info('=' * 58)
+        self.get_logger().info('=' * 60)
+        self.get_logger().info('  Elk Blendspace v3  —  17 joints, deer leg anatomy')
+        self.get_logger().info('  Front legs: elbow-DOWN (carpal bends forward)')
+        self.get_logger().info('  Rear legs:  elbow-UP   (hock bends backward)')
+        self.get_logger().info('  Cannon bone: pantograph formula cannon=LEAN-(th+kn)')
+        self.get_logger().info('  Gaits: WALK / TROT / GALLOP  |  Q = cycle')
+        self.get_logger().info('=' * 60)
 
     # ── Callbacks ──────────────────────────────────────────────────────────
 
@@ -260,7 +272,7 @@ class BlendspaceNode(Node):
         self._angular_z = msg.angular.z
 
     def _gait_cb(self, msg: String):
-        mode = msg.data.lower().strip()
+        mode    = msg.data.lower().strip()
         idx_map = {'walk': 0, 'trot': 1, 'gallop': 2}
         if mode not in idx_map:
             return
@@ -282,10 +294,8 @@ class BlendspaceNode(Node):
 
     def _joint_states_cb(self, msg: JointState):
         name_to_idx = {n: i for i, n in enumerate(msg.name)}
-
         if 'shaft_to_horse' in name_to_idx:
             self._shaft_pitch = msg.position[name_to_idx['shaft_to_horse']]
-
         if len(msg.effort) == len(msg.name):
             for leg in LEG_ORDER:
                 key = f'{leg}_knee_joint'
@@ -304,21 +314,21 @@ class BlendspaceNode(Node):
 
         gait = self._gait
 
-        # ── Body leveling (improvement #4) ─────────────────────────────
+        # Body leveling: front/rear heights compensate for cart-shaft pitch
         pitch_adj = math.tan(self._shaft_pitch) * HALF_BODY_LENGTH
         pitch_adj = max(-0.12, min(0.12, pitch_adj))
-        body_heights = {
-            'fl': BODY_HEIGHT + pitch_adj,
-            'fr': BODY_HEIGHT + pitch_adj,
-            'rl': BODY_HEIGHT - pitch_adj,
-            'rr': BODY_HEIGHT - pitch_adj,
+        ankle_heights = {
+            'fl': ANKLE_HEIGHT + pitch_adj,
+            'fr': ANKLE_HEIGHT + pitch_adj,
+            'rl': ANKLE_HEIGHT - pitch_adj,
+            'rr': ANKLE_HEIGHT - pitch_adj,
         }
 
-        # ── Active steering (improvement #3) ───────────────────────────
+        # Active steering: command cart steer joint
         turn_norm   = max(-1.0, min(1.0, ang / 1.0))
         steer_angle = turn_norm * MAX_STEER
 
-        # ── Build trajectory (50 points across one period half) ────────
+        # Build trajectory — 50 waypoints over one period
         n_pts = 50
         dt    = gait['period'] / n_pts
 
@@ -326,16 +336,21 @@ class BlendspaceNode(Node):
         msg_out.joint_names = JOINT_ORDER
 
         for i in range(n_pts):
-            phase = (self._phase + i / n_pts) % 1.0
+            phase     = (self._phase + i / n_pts) % 1.0
             positions = [steer_angle]
 
             for leg in LEG_ORDER:
-                bh  = body_heights[leg]
-                eff = self._adjusted_phase(leg, phase, gait)
+                ank_h   = ankle_heights[leg]
+                eff_ph  = self._adjusted_phase(leg, phase, gait)
 
-                fx, fy, fz = _foot_target_3d(leg, eff, lin, ang, bh, gait)
-                hip_z, thigh, knee = _ik_3d(fx, fy, fz)
-                positions += [hip_z, thigh, knee]
+                fx, fy, fz = _foot_target_3d(leg, eff_ph, lin, ang, ank_h, gait)
+
+                if leg in FRONT_LEGS:
+                    hip_z, thigh, knee, cannon = _ik_3d_front(fx, fy, fz)
+                else:
+                    hip_z, thigh, knee, cannon = _ik_3d_rear(fx, fy, fz)
+
+                positions += [hip_z, thigh, knee, cannon]
 
             pt = JointTrajectoryPoint()
             pt.positions  = positions
@@ -347,7 +362,6 @@ class BlendspaceNode(Node):
             msg_out.points.append(pt)
 
         self._pub.publish(msg_out)
-
         self._update_contact(self._phase, gait)
         self._phase = (self._phase + 0.5) % 1.0
 
@@ -357,7 +371,7 @@ class BlendspaceNode(Node):
         local = (phase - gait['phase_offsets'][leg]) % 1.0
         if self._early_contact[leg] and local < gait['swing_frac']:
             compression = CONTACT_MIN_SWING_FRAC / gait['swing_frac']
-            local = min(local * compression, gait['swing_frac'] - 0.001)
+            local       = min(local * compression, gait['swing_frac'] - 0.001)
             return (gait['phase_offsets'][leg] + local) % 1.0
         return phase
 
@@ -373,7 +387,7 @@ class BlendspaceNode(Node):
             else:
                 self._early_contact[leg] = False
 
-    # ── Idle ────────────────────────────────────────────────────────────
+    # ── Idle pose ───────────────────────────────────────────────────────
 
     def _publish_idle(self):
         turn_norm   = max(-1.0, min(1.0, self._angular_z / 1.0))
@@ -385,10 +399,14 @@ class BlendspaceNode(Node):
         pt = JointTrajectoryPoint()
         pt.positions = [
             steer_angle,
-            shoulder, NEUTRAL_THIGH, NEUTRAL_KNEE,
-            shoulder, NEUTRAL_THIGH, NEUTRAL_KNEE,
-            shoulder, NEUTRAL_THIGH, NEUTRAL_KNEE,
-            shoulder, NEUTRAL_THIGH, NEUTRAL_KNEE,
+            # fl
+            shoulder, NEUTRAL_THIGH_FRONT, NEUTRAL_KNEE_FRONT, NEUTRAL_CANNON_FRONT,
+            # fr
+            shoulder, NEUTRAL_THIGH_FRONT, NEUTRAL_KNEE_FRONT, NEUTRAL_CANNON_FRONT,
+            # rl
+            shoulder, NEUTRAL_THIGH_REAR,  NEUTRAL_KNEE_REAR,  NEUTRAL_CANNON_REAR,
+            # rr
+            shoulder, NEUTRAL_THIGH_REAR,  NEUTRAL_KNEE_REAR,  NEUTRAL_CANNON_REAR,
         ]
         pt.velocities      = [0.0] * N_JOINTS
         pt.time_from_start = Duration(sec=0, nanosec=200_000_000)
