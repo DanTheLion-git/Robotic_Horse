@@ -754,3 +754,50 @@ ros2 topic pub --once /cmd_gait std_msgs/String "data: 'gallop'"
 | knee joints | 800 | 50 | Lower leg / ballscrew |
 
 If the robot still bounces: increase d gains by 50% steps until stable.
+
+---
+
+## Section 12 — Deer Leg Anatomy and Cannon Bone
+
+### What Changed (v3)
+
+The robot now uses a **3-segment deer/horse leg** matching real elk anatomy:
+
+| Segment     | Joint        | Length | Biological equivalent              |
+|-------------|--------------|--------|------------------------------------|
+| Thigh       | thigh_joint  | 0.38 m | Femur (rear) / Humerus (front)     |
+| Shank       | knee_joint   | 0.38 m | Tibia (rear) / Radius (front)      |
+| Cannon bone | cannon_joint | 0.22 m | Metatarsal (rear) / Metacarpal (front) |
+| Hoof sphere | foot_joint   | fixed  | Distal phalanx                     |
+
+### Front vs Rear Leg Configuration
+
+Red deer forelimbs and hindlimbs bend in **opposite directions**:
+
+| Leg pair | Config     | Knee bends              | Idle (thigh / knee / cannon)  |
+|----------|------------|-------------------------|-------------------------------|
+| FL / FR  | Elbow-DOWN | Forward (away from cart)| +0.564 / -1.127 / +0.714      |
+| RL / RR  | Elbow-UP   | Backward (toward cart)  | -0.564 / +1.127 / -0.414      |
+
+With the horse facing away from the cart: front knees point forward (like a horse carpal/wrist) and rear hocks point backward — exactly how real ungulates stand.
+
+### Cannon Bone: Passive Pantograph
+
+The cannon joint is driven by a pantograph formula with no extra motor:
+
+    cannon_angle = CANNON_LEAN - (thigh + knee)
+
+This keeps the cannon about 8.6 degrees forward of vertical in world space throughout the gait, simulating the biological check-ligament that passively stiffens a deer lower leg. Benefits:
+- Zero added motor weight or complexity
+- Realistic hoof contact angle during stance
+- Automatic cannon retraction during swing phase
+
+### Tuning Cannon Stiffness
+
+| Effect you want                | What to change                                     |
+|--------------------------------|----------------------------------------------------|
+| Stiffer cannon bone            | Raise cannon_joint p in ros2_control.yaml (400->600)|
+| Less cannon oscillation        | Raise cannon_joint d (20->40)                      |
+| More forward lean on front     | Raise CANNON_LEAN in blendspace_node.py (0.15->0.25)|
+| Deeper knee bend at neutral    | Reduce ANKLE_HEIGHT in blendspace_node.py          |
+| Higher steps                   | Raise step_height in WALK/TROT/GALLOP dict         |
