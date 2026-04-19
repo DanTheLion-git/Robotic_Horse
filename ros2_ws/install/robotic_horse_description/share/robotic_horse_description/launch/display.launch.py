@@ -1,1 +1,0 @@
-/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/src/robotic_horse_description/launch/display.launch.py

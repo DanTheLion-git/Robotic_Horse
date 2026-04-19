@@ -1,1 +1,0 @@
-/home/daniel-van-leeuwen/Robotic-Horse/ros2_ws/build/robotic_horse_description/ament_cmake_environment_hooks/local_setup.sh

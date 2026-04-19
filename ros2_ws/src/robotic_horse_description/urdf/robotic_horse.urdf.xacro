@@ -4,7 +4,7 @@
   ===================================
   This is the Gazebo-compatible version of the robot description.
   It extends the base URDF with:
-    • <ros2_control> hardware interface tags  (16 controlled joints)
+    • <ros2_control> hardware interface tags  (17 controlled joints)
     • <gazebo> plugin tag  (loads gazebo_ros2_control)
     • <gazebo> material + contact tags per link
 

@@ -69,14 +69,17 @@ def generate_launch_description():
 
     # ── Spawn the robot into Gazebo ───────────────────────────────────
     # base_link is horse root (free-standing). Cart hangs from rope chain.
-    # spawn z=1.62m: body center + 50cm clearance (settles to ground via gravity).
+    # spawn z=2.50m: high enough so neither cow feet nor carriage wheels clip
+    # the ground even when passive hitch joints droop under gravity.
+    # Cow feet settle ~1.1m below base_link; carriage wheels ~1.4-2.0m below
+    # (depending on shaft pitch).  2.50m gives ample clearance for both.
     spawn_robot = Node(
         package='ros_gz_sim',
         executable='create',
         arguments=[
             '-name', 'robotic_horse',
             '-topic', 'robot_description',
-            '-x', '0.0', '-y', '0.0', '-z', '1.62',
+            '-x', '0.0', '-y', '0.0', '-z', '2.50',
         ],
         output='screen',
     )
