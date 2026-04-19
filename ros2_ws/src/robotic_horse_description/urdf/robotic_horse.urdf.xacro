@@ -13,18 +13,18 @@
       |        |
       RL –––– RR
 
-  Controlled joints (8 total):
-      {fl,fr,rl,rr}_thigh_joint  — hip flexion/extension  (position ctrl)
-      {fl,fr,rl,rr}_knee_joint   — knee driven by ballscrew (position ctrl)
-
-  Fixed joints (set at 0, no actuator needed for freestanding robot):
-      {fl,fr,rl,rr}_hip_joint    — lateral hip bracket
+  Controlled joints (16 total, QDD actuated):
+      {fl,fr,rl,rr}_hip_joint     — lateral hip yaw          (position ctrl)
+      {fl,fr,rl,rr}_thigh_joint   — hip flexion/extension    (position ctrl)
+      {fl,fr,rl,rr}_knee_joint    — stifle/elbow flexion     (position ctrl)
+      {fl,fr,rl,rr}_cannon_joint  — hock/fetlock (coupled)   (position ctrl)
 
   Physical parameters (edit here and in ros2_control.yaml):
-    Body mass  : 86 kg
-    Thigh      : 0.45 m,  1.5 kg
-    Shank      : 0.50 m,  1.0 kg
-    Foot sphere: r=0.04 m, 0.2 kg
+    Body mass  : 86 kg (QDD motors + frame + decoration)
+    Thigh      : 0.20 m,  3.5 kg
+    Shank      : 0.18 m,  3.0 kg
+    Cannon     : 0.10 m,  1.0 kg
+    Foot sphere: r=0.04 m, 0.3 kg
 -->
 <robot name="robotic_horse" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
@@ -97,8 +97,25 @@
     <material>Gazebo/DarkGrey</material>
   </gazebo>
 
-  <!-- ─── HIGHLAND COW HEAD ─────────────────────────────────── -->
-  <!-- Short thick neck + broad head with characteristic wide horns -->
+  <!-- ─── HIGHLAND COW HEAD (articulated) ───────────────────── -->
+  <!-- Neck: yaw + pitch joints for head motion
+       Head: jaw (open/close), eyes (left/right pan)
+       Small servos — total head assembly ~6.5 kg -->
+
+  <!-- Neck yaw — swivel left/right -->
+  <link name="neck_yaw_link">
+    <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+  </link>
+  <joint name="neck_yaw_joint" type="revolute">
+    <parent link="base_link"/><child link="neck_yaw_link"/>
+    <origin xyz="0.68 0 0.12" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.6" upper="0.6" effort="15.0" velocity="2.0"/>
+    <dynamics damping="2.0" friction="0.5"/>
+  </joint>
+
+  <!-- Neck pitch — nod up/down -->
   <link name="neck_link">
     <inertial><mass value="3.0"/><origin xyz="0.10 0 0" rpy="0 0 0"/>
       <inertia ixx="0.015" iyy="0.015" izz="0.008" ixy="0" ixz="0" iyz="0"/></inertial>
@@ -107,24 +124,25 @@
     <collision><origin xyz="0.10 0 0" rpy="0 0 0">
       </origin><geometry><box size="0.22 0.24 0.26"/></geometry></collision>
   </link>
-  <joint name="neck_joint" type="fixed">
-    <parent link="base_link"/><child link="neck_link"/>
-    <origin xyz="0.68 0 0.12" rpy="0 -0.10 0"/>
+  <joint name="neck_pitch_joint" type="revolute">
+    <parent link="neck_yaw_link"/><child link="neck_link"/>
+    <origin xyz="0 0 0" rpy="0 -0.10 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.5" upper="0.4" effort="20.0" velocity="2.0"/>
+    <dynamics damping="3.0" friction="0.5"/>
   </joint>
   <gazebo reference="neck_link"><material>Gazebo/Brown</material></gazebo>
 
+  <!-- Head link — skull, muzzle, nose, horns (same geometry as before) -->
   <link name="head_link">
-    <inertial><mass value="2.5"/><origin xyz="0.15 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.018" iyy="0.020" izz="0.015" ixy="0" ixz="0" iyz="0"/></inertial>
+    <inertial><mass value="2.0"/><origin xyz="0.15 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.016" iyy="0.018" izz="0.013" ixy="0" ixz="0" iyz="0"/></inertial>
     <!-- Skull — broad Highland Cow head -->
     <visual><origin xyz="0 0 0" rpy="0 0 0">
       </origin><geometry><box size="0.38 0.34 0.28"/></geometry><material name="body_panel"/></visual>
     <!-- Muzzle extending forward -->
     <visual><origin xyz="0.25 0 -0.04" rpy="0 0 0">
       </origin><geometry><box size="0.18 0.20 0.16"/></geometry><material name="body_panel"/></visual>
-    <!-- Nose -->
-    <visual><origin xyz="0.34 0 -0.05" rpy="0 0 0">
-      </origin><geometry><box size="0.05 0.12 0.08"/></geometry><material name="black"/></visual>
     <!-- LEFT horn: wide sweep outward + slight upward curl — iconic Highland Cow -->
     <visual><origin xyz="-0.06 0.20 0.11" rpy="0.20 0.25 1.30">
       </origin><geometry><cylinder radius="0.025" length="0.50"/></geometry><material name="silver"/></visual>
@@ -134,11 +152,99 @@
     <collision><origin xyz="0.10 0 0" rpy="0 0 0">
       </origin><geometry><box size="0.60 0.34 0.30"/></geometry></collision>
   </link>
-  <joint name="head_joint" type="fixed">
+  <joint name="head_nod_joint" type="revolute">
     <parent link="neck_link"/><child link="head_link"/>
     <origin xyz="0.20 0 0" rpy="0 0.10 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.3" upper="0.3" effort="8.0" velocity="3.0"/>
+    <dynamics damping="1.0" friction="0.3"/>
   </joint>
   <gazebo reference="head_link"><material>Gazebo/Brown</material></gazebo>
+
+  <!-- Jaw — opens downward (mouth) -->
+  <link name="jaw_link">
+    <inertial><mass value="0.3"/><origin xyz="0.06 0 -0.03" rpy="0 0 0"/>
+      <inertia ixx="0.0003" iyy="0.0004" izz="0.0003" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0.06 0 -0.03" rpy="0 0 0">
+      </origin><geometry><box size="0.14 0.16 0.06"/></geometry><material name="body_panel"/></visual>
+    <!-- Nose on jaw -->
+    <visual><origin xyz="0.12 0 -0.01" rpy="0 0 0">
+      </origin><geometry><box size="0.04 0.10 0.05"/></geometry><material name="black"/></visual>
+    <collision><origin xyz="0.06 0 -0.03" rpy="0 0 0">
+      </origin><geometry><box size="0.14 0.16 0.06"/></geometry></collision>
+  </link>
+  <joint name="jaw_joint" type="revolute">
+    <parent link="head_link"/><child link="jaw_link"/>
+    <origin xyz="0.20 0 -0.10" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.35" upper="0.0" effort="3.0" velocity="4.0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+  <gazebo reference="jaw_link"><material>Gazebo/Brown</material></gazebo>
+
+  <!-- Left eye -->
+  <link name="left_eye_link">
+    <inertial><mass value="0.05"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" iyy="0.00001" izz="0.00001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0" rpy="0 0 0">
+      </origin><geometry><sphere radius="0.025"/></geometry><material name="black"/></visual>
+  </link>
+  <joint name="left_eye_joint" type="revolute">
+    <parent link="head_link"/><child link="left_eye_link"/>
+    <origin xyz="0.14 0.14 0.04" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.4" upper="0.4" effort="1.0" velocity="5.0"/>
+    <dynamics damping="0.1" friction="0.05"/>
+  </joint>
+  <gazebo reference="left_eye_link"><material>Gazebo/Black</material></gazebo>
+
+  <!-- Right eye -->
+  <link name="right_eye_link">
+    <inertial><mass value="0.05"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" iyy="0.00001" izz="0.00001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0" rpy="0 0 0">
+      </origin><geometry><sphere radius="0.025"/></geometry><material name="black"/></visual>
+  </link>
+  <joint name="right_eye_joint" type="revolute">
+    <parent link="head_link"/><child link="right_eye_link"/>
+    <origin xyz="0.14 -0.14 0.04" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.4" upper="0.4" effort="1.0" velocity="5.0"/>
+    <dynamics damping="0.1" friction="0.05"/>
+  </joint>
+  <gazebo reference="right_eye_link"><material>Gazebo/Black</material></gazebo>
+
+  <!-- Left eyelid (blink) -->
+  <link name="left_eyelid_link">
+    <inertial><mass value="0.02"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.000001" iyy="0.000001" izz="0.000001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0.005 0 0.012" rpy="0 0 0">
+      </origin><geometry><box size="0.01 0.05 0.025"/></geometry><material name="body_panel"/></visual>
+  </link>
+  <joint name="left_eyelid_joint" type="revolute">
+    <parent link="head_link"/><child link="left_eyelid_link"/>
+    <origin xyz="0.16 0.14 0.06" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.8" upper="0.0" effort="0.5" velocity="8.0"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+  <gazebo reference="left_eyelid_link"><material>Gazebo/Brown</material></gazebo>
+
+  <!-- Right eyelid (blink) -->
+  <link name="right_eyelid_link">
+    <inertial><mass value="0.02"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.000001" iyy="0.000001" izz="0.000001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0.005 0 0.012" rpy="0 0 0">
+      </origin><geometry><box size="0.01 0.05 0.025"/></geometry><material name="body_panel"/></visual>
+  </link>
+  <joint name="right_eyelid_joint" type="revolute">
+    <parent link="head_link"/><child link="right_eyelid_link"/>
+    <origin xyz="0.16 -0.14 0.06" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.8" upper="0.0" effort="0.5" velocity="8.0"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+  <gazebo reference="right_eyelid_link"><material>Gazebo/Brown</material></gazebo>
 
   <!-- ═══════════════════════════════════════════════════════
        LEG LINKS & JOINTS  (macro-expanded for FL/FR/RL/RR)
@@ -485,12 +591,198 @@
   </gazebo>
 
   <!-- ═══════════════════════════════════════════════════════
-       ROS2 CONTROL — hardware interface
-       16 commanded joints: 4x hip(Z) + 4x thigh(Y) + 4x knee(Y) + 4x cannon(Y)
-       No passive joints (cart removed — robot is freestanding).
+       CARRIAGE — hitched behind the horse
+       Total carriage mass ≈ 64 kg (+ 30 kg payload)
+       Front wheels ⌀ 85 cm, Rear wheels ⌀ 105 cm
+       Track width 140 cm, Wheelbase 205 cm
   ═══════════════════════════════════════════════════════ -->
 
-  <ros2_controlname="GazeboSystem" type="system">
+  <!-- Hitch yaw joint (base_link → hitch_link) -->
+  <joint name="horse_hitch_joint" type="revolute">
+    <parent link="base_link"/><child link="hitch_link"/>
+    <origin xyz="-0.70 0 -0.10" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.5" upper="0.5" effort="0" velocity="2.0"/>
+    <dynamics damping="5.0" friction="0.1"/>
+  </joint>
+  <link name="hitch_link">
+    <inertial><mass value="1.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" iyy="0.001" izz="0.0005" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.03" length="0.10"/></geometry><material name="iron"/></visual>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.03" length="0.10"/></geometry></collision>
+  </link>
+
+  <!-- Hitch pitch joint (hitch_link → tongue_link) -->
+  <joint name="hitch_pitch_joint" type="revolute">
+    <parent link="hitch_link"/><child link="tongue_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.3" upper="0.3" effort="0" velocity="2.0"/>
+    <dynamics damping="10.0" friction="0.1"/>
+  </joint>
+  <link name="tongue_link">
+    <inertial><mass value="5.0"/><origin xyz="-0.40 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" iyy="0.027" izz="0.027" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="-0.40 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.80 0.06 0.04"/></geometry><material name="wood"/></visual>
+    <collision><origin xyz="-0.40 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.80 0.06 0.04"/></geometry></collision>
+  </link>
+
+  <!-- Cart base (tongue_link → cart_base_link) -->
+  <joint name="cart_base_joint" type="fixed">
+    <parent link="tongue_link"/><child link="cart_base_link"/>
+    <origin xyz="-0.80 0 0.10" rpy="0 0 0"/>
+  </joint>
+  <link name="cart_base_link">
+    <inertial><mass value="34.0"/><origin xyz="-0.60 0 0" rpy="0 0 0"/>
+      <inertia ixx="1.82" iyy="4.08" izz="5.90" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="-0.60 0 0" rpy="0 0 0"/>
+      <geometry><box size="1.20 0.80 0.05"/></geometry><material name="wood"/></visual>
+    <collision><origin xyz="-0.60 0 0" rpy="0 0 0"/>
+      <geometry><box size="1.20 0.80 0.05"/></geometry></collision>
+    <!-- Bench / seat -->
+    <visual><origin xyz="-0.80 0 0.175" rpy="0 0 0"/>
+      <geometry><box size="0.40 0.70 0.30"/></geometry><material name="wood"/></visual>
+    <collision><origin xyz="-0.80 0 0.175" rpy="0 0 0"/>
+      <geometry><box size="0.40 0.70 0.30"/></geometry></collision>
+  </link>
+
+  <!-- Front axle (steering) -->
+  <joint name="front_axle_joint" type="revolute">
+    <parent link="cart_base_link"/><child link="front_axle_link"/>
+    <origin xyz="-0.10 0 -0.05" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.4" upper="0.4" effort="0" velocity="2.0"/>
+    <dynamics damping="20.0" friction="0.1"/>
+  </joint>
+  <link name="front_axle_link">
+    <inertial><mass value="3.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.423" iyy="0.001" izz="0.423" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.06 1.30 0.06"/></geometry><material name="iron"/></visual>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.06 1.30 0.06"/></geometry></collision>
+  </link>
+
+  <!-- Rear axle (fixed) -->
+  <joint name="rear_axle_joint" type="fixed">
+    <parent link="cart_base_link"/><child link="rear_axle_link"/>
+    <origin xyz="-1.15 0 -0.05" rpy="0 0 0"/>
+  </joint>
+  <link name="rear_axle_link">
+    <inertial><mass value="3.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.423" iyy="0.001" izz="0.423" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.06 1.30 0.06"/></geometry><material name="iron"/></visual>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.06 1.30 0.06"/></geometry></collision>
+  </link>
+
+  <!-- ── Front-Left Wheel ── -->
+  <joint name="cart_fl_wheel_joint" type="continuous">
+    <parent link="front_axle_link"/><child link="cart_fl_wheel_link"/>
+    <origin xyz="0 0.70 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+  <link name="cart_fl_wheel_link">
+    <inertial><mass value="4.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.182" iyy="0.361" izz="0.182" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.425" length="0.06"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.425" length="0.06"/></geometry></collision>
+  </link>
+
+  <!-- ── Front-Right Wheel ── -->
+  <joint name="cart_fr_wheel_joint" type="continuous">
+    <parent link="front_axle_link"/><child link="cart_fr_wheel_link"/>
+    <origin xyz="0 -0.70 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+  <link name="cart_fr_wheel_link">
+    <inertial><mass value="4.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.182" iyy="0.361" izz="0.182" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.425" length="0.06"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.425" length="0.06"/></geometry></collision>
+  </link>
+
+  <!-- ── Rear-Left Wheel ── -->
+  <joint name="cart_rl_wheel_joint" type="continuous">
+    <parent link="rear_axle_link"/><child link="cart_rl_wheel_link"/>
+    <origin xyz="0 0.70 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+  <link name="cart_rl_wheel_link">
+    <inertial><mass value="5.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.347" iyy="0.689" izz="0.347" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.525" length="0.08"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.525" length="0.08"/></geometry></collision>
+  </link>
+
+  <!-- ── Rear-Right Wheel ── -->
+  <joint name="cart_rr_wheel_joint" type="continuous">
+    <parent link="rear_axle_link"/><child link="cart_rr_wheel_link"/>
+    <origin xyz="0 -0.70 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+  <link name="cart_rr_wheel_link">
+    <inertial><mass value="5.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.347" iyy="0.689" izz="0.347" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.525" length="0.08"/></geometry><material name="dark_grey"/></visual>
+    <collision><origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry><cylinder radius="0.525" length="0.08"/></geometry></collision>
+  </link>
+
+  <!-- ── Gazebo contact/material for carriage ── -->
+  <gazebo reference="tongue_link"><material>Gazebo/Wood</material></gazebo>
+  <gazebo reference="cart_base_link"><material>Gazebo/Wood</material></gazebo>
+  <gazebo reference="front_axle_link"><material>Gazebo/Grey</material></gazebo>
+  <gazebo reference="rear_axle_link"><material>Gazebo/Grey</material></gazebo>
+
+  <gazebo reference="cart_fl_wheel_link">
+    <material>Gazebo/DarkGrey</material>
+    <kp>1000000.0</kp><kd>100.0</kd>
+    <mu1>1.0</mu1><mu2>1.0</mu2>
+    <minDepth>0.003</minDepth>
+  </gazebo>
+  <gazebo reference="cart_fr_wheel_link">
+    <material>Gazebo/DarkGrey</material>
+    <kp>1000000.0</kp><kd>100.0</kd>
+    <mu1>1.0</mu1><mu2>1.0</mu2>
+    <minDepth>0.003</minDepth>
+  </gazebo>
+  <gazebo reference="cart_rl_wheel_link">
+    <material>Gazebo/DarkGrey</material>
+    <kp>1000000.0</kp><kd>100.0</kd>
+    <mu1>1.0</mu1><mu2>1.0</mu2>
+    <minDepth>0.003</minDepth>
+  </gazebo>
+  <gazebo reference="cart_rr_wheel_link">
+    <material>Gazebo/DarkGrey</material>
+    <kp>1000000.0</kp><kd>100.0</kd>
+    <mu1>1.0</mu1><mu2>1.0</mu2>
+    <minDepth>0.003</minDepth>
+  </gazebo>
+
+  <!-- ═══════════════════════════════════════════════════════
+       ROS2 CONTROL — hardware interface
+       16 commanded joints: 4x hip(Z) + 4x thigh(Y) + 4x knee(Y) + 4x cannon(Y)
+       Carriage wheels are passive — not included in ros2_control.
+  ═══════════════════════════════════════════════════════ -->
+
+  <ros2_control name="GazeboSystem" type="system">
     <hardware>
       <plugin>gz_ros2_control/GazeboSimSystem</plugin>
     </hardware>
