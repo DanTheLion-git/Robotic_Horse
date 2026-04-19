@@ -4,9 +4,9 @@ teleop_key.py  —  Discrete state keyboard controller for Highland Cow gait.
 Controls:
   W       — advance gait state: IDLE → WALK → TROT
   S       — decrease gait state: TROT → WALK → IDLE
-  A       — turn left  (increments turn, decays when released)
-  D       — turn right (increments turn, decays when released)
-  SPACE   — immediate IDLE (all motion stops)
+  A       — toggle turn left  (press again to go straight)
+  D       — toggle turn right (press again to go straight)
+  SPACE   — immediate IDLE (all motion stops, steering resets)
   Q       — quit
 """
 
@@ -24,9 +24,7 @@ from geometry_msgs.msg import Twist
 
 WALK_SPEED    = 0.80   # m/s published for WALK state (realistic cow walk)
 TROT_SPEED    = 1.50   # m/s published for TROT state (realistic cow trot)
-MAX_TURN      = 1.5    # rad/s
-TURN_ACCEL    = 1.2    # rad/s per second while key held
-TURN_DECAY    = 1.8    # rad/s per second natural decay
+TURN_RATE     = 0.6    # rad/s when turning
 PUBLISH_HZ    = 25
 
 
@@ -35,8 +33,8 @@ HELP = """
  ─────────────────────────────────────────
   W   = advance gait state (IDLE → WALK → TROT)
   S   = decrease gait state (TROT → WALK → IDLE)
-  A   = turn left
-  D   = turn right
+  A   = toggle turn left  (press again → straight)
+  D   = toggle turn right (press again → straight)
   SPC = immediate IDLE (stop all motion)
   Q   = quit
 
@@ -44,10 +42,16 @@ HELP = """
    [0] IDLE  — standing still
    [1] WALK  — 4-beat lateral walk
    [2] TROT  — diagonal pair trot
+
+ Steering:
+   [◀] LEFT  — turning left
+   [▶] RIGHT — turning right
+   [■] FWD   — going straight
 """
 
 SPEEDS = [0.0, WALK_SPEED, TROT_SPEED]
 STATE_NAMES = ['IDLE', 'WALK', 'TROT']
+STEER_NAMES = ['FWD', 'LEFT', 'RIGHT']
 
 
 def get_key_nonblocking():
@@ -67,17 +71,16 @@ class TeleopNode(Node):
         self._pub = self.create_publisher(Twist, '/cmd_vel', 10)
 
         self._state = 0    # 0=IDLE, 1=WALK, 2=TROT
-        self._turn  = 0.0
+        self._steer = 0    # 0=straight, 1=left, -1=right
 
         self._last_t = time.monotonic()
         self._timer  = self.create_timer(1.0 / PUBLISH_HZ, self._tick)
 
         self.get_logger().info(HELP)
-        self.get_logger().info(f'Current state: {STATE_NAMES[self._state]}')
+        self.get_logger().info(f'State: {STATE_NAMES[self._state]}  Steer: {STEER_NAMES[self._steer]}')
 
     def _tick(self):
         now = time.monotonic()
-        dt  = now - self._last_t
         self._last_t = now
 
         key = get_key_nonblocking()
@@ -100,24 +103,29 @@ class TeleopNode(Node):
                 self.get_logger().info(f'State → {STATE_NAMES[self._state]}')
         elif key == ' ':
             self._state = 0
-            self._turn  = 0.0
-            self.get_logger().info('State → IDLE')
+            self._steer = 0
+            self.get_logger().info('State → IDLE  Steer → FWD')
 
-        # Turn: ramp while key held, decay otherwise
+        # Steering: toggle on/off
         if key in ('a', 'A'):
-            self._turn = min(MAX_TURN, self._turn + TURN_ACCEL * dt)
+            if self._steer == 1:
+                self._steer = 0  # already turning left → go straight
+                self.get_logger().info('Steer → FWD')
+            else:
+                self._steer = 1  # turn left
+                self.get_logger().info('Steer → LEFT')
         elif key in ('d', 'D'):
-            self._turn = max(-MAX_TURN, self._turn - TURN_ACCEL * dt)
-        else:
-            if self._turn > 0:
-                self._turn = max(0.0, self._turn - TURN_DECAY * dt)
-            elif self._turn < 0:
-                self._turn = min(0.0, self._turn + TURN_DECAY * dt)
+            if self._steer == -1:
+                self._steer = 0  # already turning right → go straight
+                self.get_logger().info('Steer → FWD')
+            else:
+                self._steer = -1  # turn right
+                self.get_logger().info('Steer → RIGHT')
 
         # Publish
         msg = Twist()
         msg.linear.x  = SPEEDS[self._state]
-        msg.angular.z = self._turn
+        msg.angular.z = self._steer * TURN_RATE
         self._pub.publish(msg)
 
 
