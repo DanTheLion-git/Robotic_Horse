@@ -15,6 +15,9 @@
       cannon_angle = 0.08 − (thigh + knee)
 
   Compatible with PyBullet — NO Gazebo plugins or ros2_control tags.
+
+  Spawn height: z=1.08m (body center height for 150cm Highland Cow,
+  feet at ground level at neutral stance).
 -->
 <robot name="robotic_horse">
 

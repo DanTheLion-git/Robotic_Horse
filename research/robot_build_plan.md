@@ -12,10 +12,14 @@ A bovine quadruped robot modeled after a Highland Cow, attached to a real horse-
 **Carriage dimensions (real measurements):**
 | Parameter | Value |
 |---|---|
-| Track (side-to-side) | 205 cm |
-| Wheelbase (front-to-back) | 140 cm |
+| Track (side-to-side) | 145 cm |
+| Wheelbase (front-to-back) | 205 cm |
 | Front wheel diameter | 85 cm |
 | Rear wheel diameter | 105 cm |
+| Shaft length | 235 cm (U-shaped fork, 85→70 cm wide) |
+| Hitch position | 50 cm fwd + 37 cm above front wheel center |
+| Body (L×W×H) | 250 × 110 × 110 cm, ~60 cm off ground |
+| Style | Vis-à-vis (two facing bench seats) |
 
 **Key dimensions (150cm scale):**
 | Parameter | Value |
@@ -98,13 +102,20 @@ Small hobby/industrial servos for expressive animation. These don't carry struct
 | **Robot subtotal** | **~92.5 kg** | |
 | | | |
 | **Carriage** | | |
-| Carriage frame | 34.0 | Wooden deck + bench |
-| Tongue (draw bar) | 5.0 | |
-| Axles (×2) | 6.0 | Iron |
-| Front wheels (×2, ∅85cm) | 8.0 | |
-| Rear wheels (×2, ∅105cm) + hub motors | 17.0 | 5kg wheel + 3.5kg motor each |
-| Hitch hardware | 1.0 | |
-| **Carriage subtotal** | **~71.0 kg** | |
+| Carriage body (wooden frame, panels, seats) | 55.0 | Vis-à-vis body 250×110×110 cm |
+| Shaft (U-shaped fork) | 15.0 | 235 cm, wooden |
+| Tongue/hitch hardware | 2.0 | Iron pin + bracket |
+| Axles (×2) | 12.0 | Iron, front steers |
+| Front wheels (×2, ⌀85cm) | 8.0 | Wooden spoke |
+| Rear wheels (×2, ⌀105cm) + hub motors | 17.0 | 5kg wheel + 3.5kg motor each |
+| Carriage lanterns (×2) | 2.0 | Iron + glass |
+| Folding hood | 3.0 | Wooden frame |
+| Misc (springs, hardware) | 5.0 | Leaf springs, brackets |
+| **Carriage subtotal** | **~119.0 kg** | |
+| | | |
+| **Driver** | | |
+| Driver (seated) | 85.0 | On front bench |
+| **Driver subtotal** | **~85.0 kg** | |
 | | | |
 | **Electronics (on carriage)** | | |
 | Main compute (Jetson Orin / NUC) | 1.5 | |
@@ -116,7 +127,7 @@ Small hobby/industrial servos for expressive animation. These don't carry struct
 | Networking (WiFi/4G) | 0.3 | |
 | **Electronics subtotal** | **~21.0 kg** | |
 | | | |
-| **GRAND TOTAL** | **~184.5 kg** | Robot + carriage + electronics |
+| **GRAND TOTAL** | **~317.5 kg** | Robot + carriage + driver + electronics |
 
 ---
 
