@@ -95,9 +95,10 @@ NEUTRAL_CANNON_REAR  = RECIP_OFFSET - RECIP_RATIO * NEUTRAL_KNEE_REAR
 WALK = dict(
     phase_offsets={'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
     swing_frac=0.30,
-    step_height_front=0.08,  # front legs lift higher (weight-bearing)
-    step_height_rear=0.07,   # rear legs lower arc (propulsive)
-    min_stride=0.04,
+    step_height_front=0.10,  # front legs lift higher (weight-bearing)
+    step_height_rear=0.08,   # rear legs lower arc (propulsive)
+    stride_length=0.50,      # full stride at steady walk [m]
+    min_stride=0.12,         # full stride at startup [m]
     period=1.1,              # ~0.9 Hz stride frequency (bovine walk)
     name='WALK',
 )
@@ -105,9 +106,10 @@ WALK = dict(
 TROT = dict(
     phase_offsets={'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0},
     swing_frac=0.50,
-    step_height_front=0.10,  # higher clearance at trot speed
-    step_height_rear=0.09,
-    min_stride=0.05,
+    step_height_front=0.14,  # higher clearance at trot speed
+    step_height_rear=0.12,
+    stride_length=0.65,      # full stride at steady trot [m]
+    min_stride=0.18,         # full stride during trot startup [m]
     period=0.70,             # ~1.4 Hz stride frequency (bovine trot)
     name='TROT',
 )
@@ -115,16 +117,21 @@ TROT = dict(
 GAIT_SEQUENCE = [WALK, TROT]
 
 # Fixed speeds per gait state (teleop sends these exact values)
-# Walk: speed × T_stance / 2 = 0.30 × 0.77 / 2 = 0.116m → well within MAX_STEP ✓
-# Trot: speed × T_stance / 2 = 0.60 × 0.35 / 2 = 0.105m → well within MAX_STEP ✓
-WALK_SPEED     = 0.30   # m/s
-TROT_SPEED     = 0.60   # m/s
+# Walk: speed × T_stance / 2 = 0.80 × 0.77 / 2 = 0.308m → comfortably within MAX_STEP ✓
+# Trot: speed × T_stance / 2 = 1.50 × 0.35 / 2 = 0.263m → within MAX_STEP ✓
+WALK_SPEED     = 0.80   # m/s (realistic cow walk)
+TROT_SPEED     = 1.50   # m/s (realistic cow trot)
 IDLE_THRESHOLD = 0.05   # linear.x below this = IDLE
-TROT_THRESHOLD = 0.45   # linear.x above this = TROT
+TROT_THRESHOLD = 1.10   # linear.x above this = TROT
 
 # ── Control limits ────────────────────────────────────────────────────────────
 MAX_SHOULDER = 0.20   # rad  max hip Z-yaw
-MAX_STEP     = 0.22   # m    hard cap on stride half-length
+MAX_STEP     = 0.35   # m    hard cap on stride half-length
+
+# Speed ramp: strides grow from short→long over first few cycles after starting
+SPEED_RAMP_RATE    = 0.12   # ramp increment per tick (0→1 in ~8 ticks ≈ 4 cycles)
+SPEED_RAMP_INITIAL = 0.25   # starting speed fraction (25% of target speed)
+SPEED_RAMP_TRANSITION = 0.40  # speed fraction at gait transitions
 
 # Pitch-adaptive step height: lx * sin(pitch) * this scale added to each leg.
 # Front legs (lx>0): lean forward → step HIGHER. Rear (lx<0): lean forward → lower.
@@ -267,25 +274,37 @@ def _pitch_compensated_step_height(leg: str, shaft_pitch: float,
 
 def _foot_target_3d(leg: str, phase: float, linear_v: float, angular_v: float,
                     ankle_height: float, gait: dict, step_height: float,
-                    balance_offset: float = 0.0):
+                    balance_offset: float = 0.0, speed_ramp: float = 1.0):
     """
-    Raibert arc-following foot placement with 3-phase swing arc.
+    Raibert arc-following foot placement with speed-dependent stride length.
       step_height    : pitch-adapted step height for this leg.
       balance_offset : extra fx shift for body lean correction (negative = push back).
-    Minimum stride enforced: steps stay large at slow pace; cadence slows instead.
+      speed_ramp     : 0→1, scales stride from min_stride to stride_length.
+                       Models acceleration: first steps are short, full speed = long strides.
     """
     lx, ly   = LEG_POS[leg]
     T_stance = gait['period'] * (1.0 - gait['swing_frac'])
 
-    # Raibert: negative so positive linear_v = body moves away from cart
+    # Speed-dependent stride length (overrides pure Raibert when available)
+    sf = max(0.0, min(1.0, speed_ramp))
+    min_s = gait.get('min_stride', 0.10)
+    max_s = gait.get('stride_length', 0.50)
+    target_stride = min_s + (max_s - min_s) * sf
+
+    # Raibert component (for direction and angular velocity modulation)
     fx_speed = (linear_v - angular_v * ly) * T_stance / 2.0
     fy_speed = (angular_v * lx)            * T_stance / 2.0
 
-    # Enforce minimum stride: slow walking = same size steps, just slower cadence
+    # Scale fx_speed to match target stride length (half-stride)
     if abs(linear_v) > 0.05:
-        min_stride = gait.get('min_stride', 0.0)
-        if abs(fx_speed) < min_stride:
-            fx_speed = math.copysign(min_stride, fx_speed)
+        fx_half = target_stride / 2.0
+        if abs(fx_speed) > 0.001:
+            fx_speed = math.copysign(fx_half, fx_speed)
+        else:
+            fx_speed = math.copysign(fx_half, linear_v)
+
+    # Step height also scales with speed ramp (70% at startup, 100% at full speed)
+    step_height = step_height * (0.70 + 0.30 * sf)
 
     fx_mean = -fx_speed + balance_offset
     fy_mean =  fy_speed
@@ -336,6 +355,7 @@ class BlendspaceNode(Node):
 
         self._linear_x  = 0.0
         self._angular_z = 0.0
+        self._speed_ramp = 0.0  # 0→1, controls stride length ramp-up
 
         self._gait_idx  = 0
         self._gait      = WALK.copy()
@@ -366,6 +386,7 @@ class BlendspaceNode(Node):
         # Discrete state machine: teleop sends 0.0=IDLE, 0.8=WALK, 1.8=TROT
         if v < IDLE_THRESHOLD:
             self._linear_x = 0.0
+            self._speed_ramp = 0.0  # reset ramp on stop
             new_idx = 0
         elif v < TROT_THRESHOLD:
             self._linear_x = WALK_SPEED
@@ -376,8 +397,13 @@ class BlendspaceNode(Node):
         if new_idx != self._gait_idx:
             self._gait_idx = new_idx
             self._gait = GAIT_SEQUENCE[new_idx].copy()
+            # On gait transition: reset ramp to transition value (not zero)
+            self._speed_ramp = SPEED_RAMP_TRANSITION
             self._update_timer()
-            self.get_logger().info(f'Gait: {self._gait["name"]}')
+            self.get_logger().info(f'Gait: {self._gait["name"]} (stride ramp reset)')
+        # When starting from idle, begin with initial ramp
+        if self._linear_x > 0 and self._speed_ramp < SPEED_RAMP_INITIAL:
+            self._speed_ramp = SPEED_RAMP_INITIAL
 
     def _imu_cb(self, msg: Imu):
         self._body_pitch, self._body_roll = _quaternion_to_pitch_roll(msg.orientation)
@@ -403,7 +429,11 @@ class BlendspaceNode(Node):
 
         if abs(lin) < 0.01 and abs(ang) < 0.01:
             self._publish_idle()
+            self._speed_ramp = 0.0  # reset ramp when stopped
             return
+
+        # Ramp up speed fraction each tick (smooth acceleration)
+        self._speed_ramp = min(1.0, self._speed_ramp + SPEED_RAMP_RATE)
 
         gait  = self._gait
         pitch = self._body_pitch   # IMU: positive = nose up
@@ -445,7 +475,8 @@ class BlendspaceNode(Node):
 
                 fx, fy, fz = _foot_target_3d(
                     leg, eff_ph, lin, ang, ank_h, gait,
-                    step_heights[leg], balance_offset)
+                    step_heights[leg], balance_offset,
+                    speed_ramp=self._speed_ramp)
 
                 if leg in FRONT_LEGS:
                     hip_z, thigh, knee, cannon = _ik_3d_front(fx, fy, fz)

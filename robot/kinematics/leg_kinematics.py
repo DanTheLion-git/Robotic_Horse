@@ -97,9 +97,9 @@ WITHERS_HEIGHT = 1.50   # top of withers above ground [m]
 
 # Hip joint positions relative to body center (base_link origin)
 # Front: shoulder joint LOW on body (scapula sits against ribcage)
-FRONT_HIP_OFFSET = (0.65, 0.40, -0.15)   # (x_fwd, y_lat, z_down)
+FRONT_HIP_OFFSET = (0.65, 0.44, -0.15)   # (x_fwd, y_lat, z_down) — widened for 0.88m body
 # Rear: hip joint HIGH on body (near top of pelvis)
-REAR_HIP_OFFSET  = (-0.65, 0.36, 0.12)   # (x_back, y_lat, z_up)
+REAR_HIP_OFFSET  = (-0.65, 0.40, 0.12)   # (x_back, y_lat, z_up) — widened for 0.88m body
 
 # Absolute hip heights above ground
 FRONT_HIP_HEIGHT = BODY_CENTER_Z + FRONT_HIP_OFFSET[2]  # 1.08 - 0.15 = 0.93 m

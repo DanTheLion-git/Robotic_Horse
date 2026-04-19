@@ -22,8 +22,8 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 
 
-WALK_SPEED    = 0.30   # m/s published for WALK state
-TROT_SPEED    = 0.65   # m/s published for TROT state
+WALK_SPEED    = 0.80   # m/s published for WALK state (realistic cow walk)
+TROT_SPEED    = 1.50   # m/s published for TROT state (realistic cow trot)
 MAX_TURN      = 1.5    # rad/s
 TURN_ACCEL    = 1.2    # rad/s per second while key held
 TURN_DECAY    = 1.8    # rad/s per second natural decay

@@ -57,8 +57,8 @@ BODY_WIDTH   = 0.80   # 2 × 0.40 m lateral hip offset
 N_FRAMES     = 60     # frames per animation
 DURATION     = 1.0    # seconds per full gait cycle
 SWING_FRAC   = 0.40
-MAX_STEP     = 0.22   # hard cap on stride half-length
-STEP_LENGTH  = 0.14
+MAX_STEP     = 0.35   # hard cap on stride half-length [m]
+STEP_LENGTH  = 0.50   # full stride at steady walk [m]
 
 JOINT_NAMES = [
     "fl_hip_joint", "fl_thigh_joint", "fl_knee_joint", "fl_cannon_joint",
@@ -166,8 +166,8 @@ def build_idle(n_frames: int = N_FRAMES):
 
 
 def build_parametric(speed: float, angular_rate: float,
-                      step_height_front: float = 0.08,
-                      step_height_rear: float = 0.07,
+                      step_height_front: float = 0.10,
+                      step_height_rear: float = 0.08,
                       n_frames: int = N_FRAMES,
                       phase_offsets=None):
     """General gait with differential step lengths and front/rear step heights."""

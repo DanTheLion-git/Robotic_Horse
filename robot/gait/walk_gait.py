@@ -52,10 +52,11 @@ WALK = {
     'phase_offsets': {'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
     'swing_frac': 0.30,        # 30% swing / 70% stance (duty factor 0.70)
     'period': 1.1,             # seconds per full stride cycle
-    'step_height_front': 0.08, # front legs lift higher (weight-bearing clearance)
-    'step_height_rear': 0.07,  # rear legs slightly lower arc
-    'min_stride': 0.06,        # minimum stride half-length [m]
-    'speed': 0.30,             # target walking speed [m/s]
+    'step_height_front': 0.10, # front legs lift higher (weight-bearing clearance)
+    'step_height_rear': 0.08,  # rear legs slightly lower arc
+    'stride_length': 0.50,     # full stride at steady-state speed [m]
+    'min_stride': 0.12,        # full stride at startup / acceleration [m]
+    'speed': 0.80,             # target walking speed [m/s] (real cow ~0.8-1.0)
 }
 
 # ── TROT gait — 2-beat diagonal ───────────────────────────────────
@@ -65,17 +66,17 @@ TROT = {
     'phase_offsets': {'fl': 0.0, 'rr': 0.0, 'fr': 0.50, 'rl': 0.50},
     'swing_frac': 0.50,        # 50% swing / 50% stance (duty factor 0.50)
     'period': 0.70,            # faster cadence for trot
-    'step_height_front': 0.10, # higher clearance needed at trot speed
-    'step_height_rear': 0.09,
-    'min_stride': 0.07,
-    'speed': 0.60,             # target trotting speed [m/s]
+    'step_height_front': 0.14, # higher clearance needed at trot speed
+    'step_height_rear': 0.12,
+    'stride_length': 0.65,     # full stride at steady trot [m]
+    'min_stride': 0.18,        # full stride during trot startup [m]
+    'speed': 1.50,             # target trotting speed [m/s] (real cow ~1.5-2.5)
 }
 
 GAIT_SEQUENCE = [WALK, TROT]
 
 # ── Gait parameters ───────────────────────────────────────────────
-STEP_LENGTH    = 0.14    # base stride half-length [m] (scaled up)
-MAX_STEP       = 0.22    # hard cap on stride half-length [m]
+MAX_STEP       = 0.35    # hard cap on stride half-length [m]
 
 # ── Overtracking ──────────────────────────────────────────────────
 # Rear hooves land slightly ahead of where the ipsilateral front hoof was
@@ -148,15 +149,18 @@ def _stance_trajectory(phase: float, half_stride: float,
 
 
 def joint_angles_at_phase(leg: str, global_phase: float,
-                          gait: dict = None) -> tuple[float, float, float]:
+                          gait: dict = None,
+                          speed_fraction: float = 1.0) -> tuple[float, float, float]:
     """
     Return (theta_hip, theta_knee, theta_cannon) for a given leg at a gait phase.
 
     Parameters
     ----------
-    leg          : 'fl', 'fr', 'rl', 'rr'
-    global_phase : gait phase ∈ [0, 1)
-    gait         : gait parameters dict (defaults to WALK)
+    leg            : 'fl', 'fr', 'rl', 'rr'
+    global_phase   : gait phase ∈ [0, 1)
+    gait           : gait parameters dict (defaults to WALK)
+    speed_fraction : 0→1, controls stride length (0=min_stride, 1=full stride).
+                     Models acceleration: first steps are short, steady state is long.
 
     Returns
     -------
@@ -169,10 +173,17 @@ def joint_angles_at_phase(leg: str, global_phase: float,
     elbow_up = is_rear
     ankle_h = ANKLE_HEIGHT_REAR if is_rear else ANKLE_HEIGHT_FRONT
 
-    # Get leg-specific parameters
-    step_h = gait['step_height_rear'] if is_rear else gait['step_height_front']
+    # Speed-dependent stride: ramp from min_stride to full stride_length
+    sf = max(0.0, min(1.0, speed_fraction))
+    stride = gait['min_stride'] + (gait['stride_length'] - gait['min_stride']) * sf
+
+    # Step height also scales with speed (70% at startup, 100% at full speed)
+    height_scale = 0.70 + 0.30 * sf
+    step_h_base = gait['step_height_rear'] if is_rear else gait['step_height_front']
+    step_h = step_h_base * height_scale
+
     overtrack = OVERTRACK_REAR if is_rear else OVERTRACK_FRONT
-    half_stride = STEP_LENGTH / 2.0 + overtrack
+    half_stride = stride / 2.0 + overtrack
 
     local_phase = (global_phase - gait['phase_offsets'][leg]) % 1.0
 
@@ -209,14 +220,19 @@ def joint_angles_at_phase(leg: str, global_phase: float,
 
 
 def generate_gait_trajectory(n_steps: int = 200,
-                             gait: dict = None) -> dict:
+                             gait: dict = None,
+                             speed_fraction: float = 1.0,
+                             ramp_cycles: int = 0) -> dict:
     """
     Generate a full gait cycle trajectory for all four legs.
 
     Parameters
     ----------
-    n_steps : number of time steps per full gait cycle
-    gait    : gait parameters dict (defaults to WALK)
+    n_steps        : number of time steps per full gait cycle
+    gait           : gait parameters dict (defaults to WALK)
+    speed_fraction : constant speed fraction (used when ramp_cycles=0)
+    ramp_cycles    : if >0, ramp speed_fraction from 0.3→1.0 over this many
+                     stride cycles. Overrides speed_fraction with a per-step ramp.
 
     Returns
     -------
@@ -237,7 +253,15 @@ def generate_gait_trajectory(n_steps: int = 200,
         cannons = np.zeros(n_steps)
 
         for i, p in enumerate(phases):
-            hips[i], knees[i], cannons[i] = joint_angles_at_phase(leg, p, gait)
+            if ramp_cycles > 0:
+                # Ramp from 0.3 to 1.0 over ramp_cycles full cycles
+                cycle_progress = p  # within one cycle
+                sf = 0.3 + 0.7 * min(1.0, cycle_progress * ramp_cycles)
+            else:
+                sf = speed_fraction
+
+            hips[i], knees[i], cannons[i] = joint_angles_at_phase(
+                leg, p, gait, speed_fraction=sf)
 
         result[leg] = {
             "theta_hip":    hips,
