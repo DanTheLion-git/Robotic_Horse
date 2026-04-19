@@ -54,7 +54,7 @@ RECIP_RATIO  = 0.85    # coupling ratio (slightly sub-unity like real cattle)
 RECIP_OFFSET = -0.05 + RECIP_RATIO * 0.505  # ≈ 0.379 rad
 
 # Body centre height and per-leg ankle heights
-BODY_HEIGHT  = 1.08    # body centre Z [m]
+BODY_HEIGHT  = 1.12    # body centre Z [m]
 ANKLE_HEIGHT_FRONT = L1_FRONT + L2_FRONT - L3_FRONT * math.cos(CANNON_LEAN) - FOOT_R_FRONT  # ≈ 0.70 m
 ANKLE_HEIGHT_REAR  = L1_REAR + L2_REAR - L3_REAR * math.cos(CANNON_LEAN) - FOOT_R_REAR      # ≈ 0.92 m (approx)
 # Override with spec values
@@ -66,12 +66,12 @@ FRONT_HIP_HEIGHT = 0.93   # m
 REAR_HIP_HEIGHT  = 1.20   # m
 
 # Hip positions in base_link (x=fwd, y=left, z=up)
-# Body: ~1.30m L × 0.80m W; front hip xyz="0.65 ±0.40 -0.15", rear hip xyz="-0.65 ±0.36 0.12"
+# Body: ~1.80m L × 0.88m W; front hip xyz="0.65 ±0.44 -0.15", rear hip xyz="-0.65 ±0.40 0.12"
 LEG_POS = {
-    'fl': ( 0.65,  0.40),
-    'fr': ( 0.65, -0.40),
-    'rl': (-0.65,  0.36),
-    'rr': (-0.65, -0.36),
+    'fl': ( 0.65,  0.44),
+    'fr': ( 0.65, -0.44),
+    'rl': (-0.65,  0.40),
+    'rr': (-0.65, -0.40),
 }
 HALF_BODY_LENGTH = 0.65
 
@@ -139,7 +139,7 @@ PITCH_STEP_SCALE = 1.2
 
 # Balance correction: lean forward → shift all foot targets backward by this gain.
 # Helps CoM stay over support polygon during gait.
-BALANCE_FOOT_GAIN = 0.25   # m shift per rad of lean
+BALANCE_FOOT_GAIN = 0.40   # m shift per rad of lean (increased for stability)
 
 # Minimum step height so rear legs never drop to zero clearance.
 MIN_STEP_HEIGHT = 0.04    # m
@@ -292,22 +292,29 @@ def _foot_target_3d(leg: str, phase: float, linear_v: float, angular_v: float,
     target_stride = min_s + (max_s - min_s) * sf
 
     # Raibert component (for direction and angular velocity modulation)
+    # angular_v differential: inner legs take shorter strides during turns
     fx_speed = (linear_v - angular_v * ly) * T_stance / 2.0
     fy_speed = (angular_v * lx)            * T_stance / 2.0
 
-    # Scale fx_speed to match target stride length (half-stride)
+    # Scale fx_speed to match target stride length, PRESERVING the turning
+    # differential from angular_v (don't just replace with a fixed value)
     if abs(linear_v) > 0.05:
         fx_half = target_stride / 2.0
-        if abs(fx_speed) > 0.001:
-            fx_speed = math.copysign(fx_half, fx_speed)
+        base_fx = linear_v * T_stance / 2.0
+        if abs(base_fx) > 0.001:
+            scale = fx_half / abs(base_fx)
+            fx_speed *= scale
+            fy_speed *= scale
         else:
             fx_speed = math.copysign(fx_half, linear_v)
 
     # Step height also scales with speed ramp (70% at startup, 100% at full speed)
     step_height = step_height * (0.70 + 0.30 * sf)
 
-    fx_mean = -fx_speed + balance_offset
-    fy_mean =  fy_speed
+    # Foot placement: positive fx = foot IN FRONT of hip at touchdown
+    # Stance sweeps from +fx_mean (front) to -fx_mean (back) → pushes body forward
+    fx_mean = fx_speed + balance_offset
+    fy_mean = fy_speed
     fx_mean  = max(-MAX_STEP,       min(MAX_STEP,       fx_mean))
     fy_mean  = max(-MAX_STEP * 0.5, min(MAX_STEP * 0.5, fy_mean))
 
@@ -456,8 +463,10 @@ class BlendspaceNode(Node):
             for leg in LEG_ORDER
         }
 
-        # Balance correction: lean forward (negative pitch/nose down) → shift feet backward
-        balance_offset = pitch * BALANCE_FOOT_GAIN
+        # Balance correction: lean forward (nose down = negative pitch) →
+        # shift all foot targets FORWARD to bring support under CoM.
+        # After gait direction fix: positive balance_offset = feet further forward.
+        balance_offset = -pitch * BALANCE_FOOT_GAIN
 
         n_pts = 50
         dt    = gait['period'] / n_pts

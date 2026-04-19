@@ -59,14 +59,7 @@ def generate_launch_description():
         output='screen',
     )
 
-    # ── 4. Force / marker node ────────────────────────────────────────
-    force_node = Node(
-        package='robotic_horse_control',
-        executable='force_node',
-        name='force_node',
-        parameters=[{'use_sim_time': True}],
-        output='screen',
-    )
+    # (force_node removed — obsolete ballscrew model, incorrect M_BODY=20kg)
 
     return LaunchDescription([
         # Gazebo starts immediately
@@ -75,6 +68,6 @@ def generate_launch_description():
         # RViz2 after 4 s (Gazebo window is up, robot description available)
         TimerAction(period=4.0, actions=[rviz2]),
 
-        # Blendspace + force nodes after 9 s (controllers active by then)
-        TimerAction(period=9.0, actions=[blendspace_node, force_node]),
+        # Blendspace controller after 9 s (controllers active by then)
+        TimerAction(period=9.0, actions=[blendspace_node]),
     ])
