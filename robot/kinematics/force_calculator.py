@@ -17,7 +17,9 @@ Weight distribution: 55% front / 45% rear (bovine standard).
 
 import numpy as np
 from robot.kinematics.leg_kinematics import (
-    L1, L2, L3,
+    L1_FRONT, L2_FRONT, L3_FRONT,
+    L1_REAR, L2_REAR, L3_REAR,
+    get_leg_dims,
     forward_kinematics,
     cannon_angle,
     FRONT_WEIGHT_FRACTION,
@@ -25,18 +27,39 @@ from robot.kinematics.leg_kinematics import (
 )
 
 
-# ── Robot mass parameters (Highland Cow build) ────────────────────
+# ── Robot mass parameters (150 cm Highland Cow build) ─────────────
 G = 9.81            # gravitational acceleration [m/s²]
-M_BODY   = 86.0     # total robot mass [kg] (QDD build is lighter)
-M_HIP    = 2.0      # hip bracket mass per leg [kg]
-M_THIGH  = 3.5      # upper-leg + QDD motor per leg [kg]
-M_SHANK  = 3.0      # lower-leg + QDD motor per leg [kg]
-M_CANNON = 1.0      # cannon bone per leg [kg]
-M_FOOT   = 0.3      # hoof sphere mass per leg [kg]
+M_BODY   = 107.0    # total robot mass [kg] (larger frame, same motors)
 NUM_LEGS = 4
 
-# Per-leg mass
-M_LEG = M_HIP + M_THIGH + M_SHANK + M_CANNON + M_FOOT  # 9.8 kg
+# Per-leg masses differ for front (shorter) vs rear (longer) legs
+M_HIP    = 2.0      # hip bracket mass [kg] (same both)
+
+M_THIGH_FRONT  = 4.0   # humerus + QDD motor [kg]
+M_SHANK_FRONT  = 3.5   # radius + QDD motor [kg]
+M_CANNON_FRONT = 1.0   # metacarpal [kg]
+M_FOOT_FRONT   = 0.4   # front hoof [kg]
+M_LEG_FRONT = M_HIP + M_THIGH_FRONT + M_SHANK_FRONT + M_CANNON_FRONT + M_FOOT_FRONT  # 10.9 kg
+
+M_THIGH_REAR   = 5.0   # femur + QDD motor [kg] (longer, heavier)
+M_SHANK_REAR   = 4.0   # tibia + QDD motor [kg]
+M_CANNON_REAR  = 1.2   # metatarsal [kg]
+M_FOOT_REAR    = 0.5   # rear hoof (larger) [kg]
+M_LEG_REAR  = M_HIP + M_THIGH_REAR + M_SHANK_REAR + M_CANNON_REAR + M_FOOT_REAR  # 12.7 kg
+
+# Backward-compatible aliases (average)
+M_THIGH  = M_THIGH_FRONT
+M_SHANK  = M_SHANK_FRONT
+M_CANNON = M_CANNON_FRONT
+M_FOOT   = M_FOOT_FRONT
+M_LEG    = M_LEG_FRONT
+
+
+def get_leg_masses(is_front: bool):
+    """Return (m_thigh, m_shank, m_cannon, m_foot, m_leg_total) for front/rear."""
+    if is_front:
+        return M_THIGH_FRONT, M_SHANK_FRONT, M_CANNON_FRONT, M_FOOT_FRONT, M_LEG_FRONT
+    return M_THIGH_REAR, M_SHANK_REAR, M_CANNON_REAR, M_FOOT_REAR, M_LEG_REAR
 
 # ── QDD Motor specifications ──────────────────────────────────────
 QDD_SPECS = {
@@ -86,7 +109,8 @@ QDD_SPECS = {
 def weight_per_leg(is_front: bool) -> float:
     """Vertical load on one leg based on bovine 55/45 weight distribution [N]."""
     frac = FRONT_WEIGHT_FRACTION if is_front else REAR_WEIGHT_FRACTION
-    return (M_BODY * frac / 2.0 + M_LEG) * G
+    m_leg = M_LEG_FRONT if is_front else M_LEG_REAR
+    return (M_BODY * frac / 2.0 + m_leg) * G
 
 
 def joint_torques_static(
@@ -111,6 +135,9 @@ def joint_torques_static(
     dict with 'hip_pitch', 'knee', 'cannon' torques [N·m]
     """
     is_rear = not is_front
+    l1, l2, l3, _ = get_leg_dims(is_rear)
+    m_thigh, m_shank, m_cannon, m_foot, _ = get_leg_masses(is_front)
+
     fk = forward_kinematics(theta_hip, theta_knee,
                             include_cannon=True, is_rear=is_rear)
     foot_x, foot_z = fk["foot_pos"]
@@ -121,22 +148,20 @@ def joint_torques_static(
     grf = weight_per_leg(is_front)
 
     # ── Hip pitch torque ──
-    # Moment arm = horizontal distance from hip to foot contact
     tau_hip = grf * abs(foot_x)
 
     # ── Knee torque ──
-    # Moment arm = horizontal distance from knee to foot
     tau_knee = grf * abs(foot_x - knee_x)
 
     # Add gravity torques of shank + cannon segments about knee
     shank_angle = theta_hip + theta_knee
-    tau_knee += M_SHANK * G * (L2 / 2) * abs(np.sin(shank_angle))
-    tau_knee += M_CANNON * G * L2 * abs(np.sin(shank_angle))
-    tau_knee += M_FOOT * G * L2 * abs(np.sin(shank_angle))
+    tau_knee += m_shank * G * (l2 / 2) * abs(np.sin(shank_angle))
+    tau_knee += m_cannon * G * l2 * abs(np.sin(shank_angle))
+    tau_knee += m_foot * G * l2 * abs(np.sin(shank_angle))
 
     # ── Cannon torque ──
     ca = fk["cannon_angle"]
-    tau_cannon = (M_CANNON / 2 + M_FOOT) * G * L3 * abs(np.sin(ca))
+    tau_cannon = (m_cannon / 2 + m_foot) * G * l3 * abs(np.sin(ca))
 
     return {
         'hip_pitch': tau_hip,

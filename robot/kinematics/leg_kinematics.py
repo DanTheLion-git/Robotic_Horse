@@ -1,17 +1,18 @@
 """
-Leg kinematics for a 3-segment quadruped leg modeled on Highland Cow anatomy.
+Leg kinematics for the Highland Cow quadruped robot (150 cm scale).
 
-Highland Cow Build — stocky low-CoM quadruped with bovine leg proportions.
+Anatomically accurate bovine proportions — front and rear legs have
+different segment lengths, matching real cattle skeletal geometry.
 
 Anatomical mapping
 ──────────────────
-  FRONT LEG (Thoracic limb):
+  FRONT LEG (Thoracic limb) — shorter, lower shoulder attachment:
     hip_joint   → Shoulder (scapulohumeral) — yaw for lateral placement
     thigh_joint → Humerus (upper arm)       — pitch flex/ext
     knee_joint  → Elbow/Carpus combined     — pitch flex/ext (elbow-DOWN)
     cannon_joint→ Metacarpal (cannon bone)  — PASSIVE linkage keeps vertical
 
-  REAR LEG (Pelvic limb):
+  REAR LEG (Pelvic limb) — longer, higher hip attachment:
     hip_joint   → Hip (coxofemoral)         — yaw for lateral placement
     thigh_joint → Femur (thigh)             — pitch flex/ext
     knee_joint  → Stifle (true knee)        — pitch flex/ext (elbow-UP)
@@ -26,15 +27,19 @@ Reciprocal Apparatus (rear legs only)
   Robot model:
     cannon_rear = RECIP_OFFSET - RECIP_RATIO × knee_angle
     RECIP_RATIO ≈ 0.85 (slightly less than 1:1 real coupling)
-    RECIP_OFFSET chosen so cannon ≈ -0.47 rad at neutral stance
+    RECIP_OFFSET calibrated so cannon ≈ -0.05 rad at neutral rear stance
 
 Front leg cannon (passive geometry — keeps metacarpal near-vertical):
     cannon_front = CANNON_LEAN - (thigh_angle + knee_angle)
 
-QDD Actuation
-─────────────
-  All joints use quasi-direct-drive (QDD) motors — low-ratio planetary gearboxes
-  that are backdrivable, compliant, and provide torque sensing via motor current.
+Body shape
+──────────
+  The body is NOT a uniform box — it follows bovine anatomy:
+    - Withers (highest point, 1.50 m) at front-top where scapulae meet spine
+    - Spine slopes slightly down to rump (~1.40 m)
+    - Front shoulder joint is LOW on the body (at ~0.93 m above ground)
+    - Rear hip joint is HIGH on the body (at ~1.20 m above ground)
+    - Rear legs are longer than front legs (femur > humerus, tibia > radius)
 
 Coordinate convention (URDF)
 ────────────────────────────
@@ -47,93 +52,147 @@ import math
 import numpy as np
 
 
-# ── Leg geometry (Highland Cow) ────────────────────────────────────
-L1 = 0.20       # thigh (humerus/femur) length  [m]
-L2 = 0.18       # shank (radius/tibia) length   [m]
-L3 = 0.10       # cannon bone (metacarpal/metatarsal) length  [m]
-FOOT_R = 0.04   # hoof sphere radius  [m]
+# ══════════════════════════════════════════════════════════════════
+#  LEG SEGMENT LENGTHS  —  Front vs Rear (bovine proportions)
+# ══════════════════════════════════════════════════════════════════
 
-# ── Cannon bone passive linkage ────────────────────────────────────
-CANNON_LEAN = 0.08  # front leg: cannon forward lean at neutral [rad]
+# ── Front leg (thoracic limb: humerus + radius + metacarpal) ──────
+L1_FRONT = 0.38     # humerus length [m]
+L2_FRONT = 0.34     # radius/ulna length [m]
+L3_FRONT = 0.18     # metacarpal (cannon bone) length [m]
+FOOT_R_FRONT = 0.05 # front hoof sphere radius [m]
+
+# ── Rear leg (pelvic limb: femur + tibia + metatarsal) ────────────
+L1_REAR = 0.50      # femur length [m]
+L2_REAR = 0.45      # tibia length [m]
+L3_REAR = 0.22      # metatarsal (cannon bone) length [m]
+FOOT_R_REAR = 0.06  # rear hoof sphere radius [m]
+
+# ── Backward-compatible aliases (default to front) ────────────────
+L1 = L1_FRONT
+L2 = L2_FRONT
+L3 = L3_FRONT
+FOOT_R = FOOT_R_FRONT
+
+
+def get_leg_dims(is_rear: bool = False):
+    """Return (L1, L2, L3, FOOT_R) for front or rear leg."""
+    if is_rear:
+        return L1_REAR, L2_REAR, L3_REAR, FOOT_R_REAR
+    return L1_FRONT, L2_FRONT, L3_FRONT, FOOT_R_FRONT
+
+
+# ══════════════════════════════════════════════════════════════════
+#  BODY GEOMETRY & HIP POSITIONS
+# ══════════════════════════════════════════════════════════════════
+
+# Body dimensions (bovine-shaped, not a simple box)
+BODY_LENGTH = 1.80      # shoulder to rump [m]
+BODY_WIDTH  = 0.80      # ribcage width [m]
+BODY_MAIN_HEIGHT = 0.55 # main barrel/ribcage height [m]
+
+# Body center height above ground when standing
+BODY_CENTER_Z = 1.08    # [m]
+WITHERS_HEIGHT = 1.50   # top of withers above ground [m]
+
+# Hip joint positions relative to body center (base_link origin)
+# Front: shoulder joint LOW on body (scapula sits against ribcage)
+FRONT_HIP_OFFSET = (0.65, 0.40, -0.15)   # (x_fwd, y_lat, z_down)
+# Rear: hip joint HIGH on body (near top of pelvis)
+REAR_HIP_OFFSET  = (-0.65, 0.36, 0.12)   # (x_back, y_lat, z_up)
+
+# Absolute hip heights above ground
+FRONT_HIP_HEIGHT = BODY_CENTER_Z + FRONT_HIP_OFFSET[2]  # 1.08 - 0.15 = 0.93 m
+REAR_HIP_HEIGHT  = BODY_CENTER_Z + REAR_HIP_OFFSET[2]   # 1.08 + 0.12 = 1.20 m
+
+
+# ══════════════════════════════════════════════════════════════════
+#  CANNON BONE — Passive linkage & Reciprocal apparatus
+# ══════════════════════════════════════════════════════════════════
+
+CANNON_LEAN = 0.08  # front cannon forward lean at neutral [rad]
 
 # Reciprocal apparatus coupling (rear legs only)
-# At neutral stance: knee_rear = +1.10 rad, cannon_rear = -0.47 rad
-# cannon = RECIP_OFFSET - RECIP_RATIO * knee
-RECIP_RATIO  = 0.85    # coupling ratio (stifle-to-hock, slightly sub-unity)
-RECIP_OFFSET = -0.47 + RECIP_RATIO * 1.10  # ≈ 0.465 rad
+RECIP_RATIO = 0.85  # stifle-to-hock coupling ratio (sub-unity)
 
-# ── Bovine joint range limits ──────────────────────────────────────
-# Based on bovine biomechanics research, scaled for our robot.
+# Calibrate RECIP_OFFSET so cannon ≈ -0.05 rad at neutral rear stance
+# Neutral rear knee ≈ +0.505 rad (from IK at ankle height 0.92m)
+_NEUTRAL_KNEE_REAR = 0.505
+_NEUTRAL_CANNON_REAR = -0.05  # slight back-lean at stance
+RECIP_OFFSET = _NEUTRAL_CANNON_REAR + RECIP_RATIO * _NEUTRAL_KNEE_REAR  # ≈ 0.379
+
+
+# ══════════════════════════════════════════════════════════════════
+#  STANCE GEOMETRY (front and rear have different ankle heights)
+# ══════════════════════════════════════════════════════════════════
+
+# Ankle height = hip_height - cannon*cos(lean) - foot_radius
+ANKLE_HEIGHT_FRONT = (
+    FRONT_HIP_HEIGHT - L3_FRONT * math.cos(CANNON_LEAN) - FOOT_R_FRONT
+)  # ≈ 0.70 m
+
+ANKLE_HEIGHT_REAR = (
+    REAR_HIP_HEIGHT - L3_REAR * math.cos(CANNON_LEAN) - FOOT_R_REAR
+)  # ≈ 0.92 m
+
+# Backward-compatible alias (front leg default)
+BODY_HEIGHT = FRONT_HIP_HEIGHT
+ANKLE_HEIGHT = ANKLE_HEIGHT_FRONT
+
+
+def get_ankle_height(is_rear: bool = False) -> float:
+    """Return ankle height for front or rear leg."""
+    return ANKLE_HEIGHT_REAR if is_rear else ANKLE_HEIGHT_FRONT
+
+
+# ══════════════════════════════════════════════════════════════════
+#  JOINT LIMITS (bovine biomechanics)
+# ══════════════════════════════════════════════════════════════════
+
 JOINT_LIMITS = {
-    'hip_yaw':       (-0.35, 0.35),    # lateral splay ±20°
-    'front_thigh':   (-0.30, 1.20),    # shoulder flex/ext (~-17° to +69°)
-    'front_knee':    (-1.80, -0.10),   # elbow-DOWN: carpus flexion (negative)
-    'front_cannon':  (-0.50, 1.50),    # metacarpal passive range
-    'rear_thigh':    (-1.20, 0.30),    # hip flex/ext (symmetric to front)
-    'rear_knee':     (0.10, 1.80),     # elbow-UP: stifle flexion (positive)
-    'rear_cannon':   (-1.50, 0.80),    # metatarsal reciprocal range
+    'hip_yaw':       (-0.35, 0.35),
+    'front_thigh':   (-0.30, 1.20),
+    'front_knee':    (-1.80, -0.10),
+    'front_cannon':  (-0.50, 1.50),
+    'rear_thigh':    (-1.20, 0.30),
+    'rear_knee':     (0.10, 1.80),
+    'rear_cannon':   (-1.50, 0.80),
 }
 
-# ── Weight distribution ───────────────────────────────────────────
-# Cattle carry ~55% of weight on front legs, ~45% on rear
+
+# ══════════════════════════════════════════════════════════════════
+#  WEIGHT DISTRIBUTION
+# ══════════════════════════════════════════════════════════════════
+
 FRONT_WEIGHT_FRACTION = 0.55
 REAR_WEIGHT_FRACTION  = 0.45
 
-# ── Stance geometry ───────────────────────────────────────────────
-# Deep crouch neutral: thigh=0.55 rad, knee=-1.10 rad (front)
-# FK hip height: L1*cos(0.55) + L2*cos(0.55) + L3*cos(CANNON_LEAN) + FOOT_R
-#              = 0.1705 + 0.1535 + 0.0997 + 0.04 = 0.464 m
-BODY_HEIGHT = 0.464       # nominal hip-to-ground distance [m]
-ANKLE_HEIGHT = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # ≈ 0.324 m
 
-
-# ── Cannon bone angle functions ────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  CANNON BONE ANGLE FUNCTIONS
+# ══════════════════════════════════════════════════════════════════
 
 def cannon_angle_front(theta_thigh: float, theta_knee: float) -> float:
-    """
-    Front leg cannon (metacarpal) angle — passive linkage keeps near-vertical.
-
-    This is a geometric constraint: the cannon bone is connected via a
-    parallelogram linkage that approximately cancels the combined rotation
-    of the thigh and shank, keeping the metacarpal pointing downward.
-    """
+    """Front leg cannon — passive parallelogram keeps metacarpal near-vertical."""
     return CANNON_LEAN - (theta_thigh + theta_knee)
 
 
 def cannon_angle_rear(theta_knee: float) -> float:
-    """
-    Rear leg cannon (metatarsal) angle — reciprocal apparatus.
-
-    The peroneus tertius and superficial digital flexor tendons create a
-    mechanical coupling between the stifle (knee) and hock (cannon):
-      - When stifle flexes → hock flexes proportionally
-      - Coupling ratio ≈ 0.85:1 (slightly sub-unity)
-      - This is equivalent to a four-bar linkage
-
-    Returns cannon joint angle [rad].
-    """
+    """Rear leg cannon — reciprocal apparatus couples stifle to hock."""
     return RECIP_OFFSET - RECIP_RATIO * theta_knee
 
 
 def cannon_angle(theta_hip: float, theta_knee: float,
                  is_rear: bool = False) -> float:
-    """
-    Unified cannon angle function for any leg.
-
-    Parameters
-    ----------
-    theta_hip   : thigh joint angle [rad]
-    theta_knee  : knee joint angle [rad]
-    is_rear     : True for rear legs (reciprocal apparatus), False for front
-
-    Returns cannon joint angle [rad].
-    """
+    """Unified cannon angle for any leg."""
     if is_rear:
         return cannon_angle_rear(theta_knee)
     return cannon_angle_front(theta_hip, theta_knee)
 
 
-# ── Forward Kinematics ────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  FORWARD KINEMATICS
+# ══════════════════════════════════════════════════════════════════
 
 def forward_kinematics(theta_hip: float, theta_knee: float,
                        include_cannon: bool = True,
@@ -141,29 +200,19 @@ def forward_kinematics(theta_hip: float, theta_knee: float,
     """
     Compute joint positions in the hip frame given joint angles.
 
-    Uses the 2-link (thigh+shank) chain to the ankle, then appends the
-    passively-driven cannon bone to get the hoof position.
+    Uses leg-specific segment lengths (front vs rear).
 
-    Parameters
-    ----------
-    theta_hip      : Hip flex/ext angle [rad]. Positive = forward.
-    theta_knee     : Knee flexion angle [rad]. Negative = front, positive = rear.
-    include_cannon : If True, compute cannon + hoof positions.
-    is_rear        : Use reciprocal apparatus (rear) vs passive linkage (front).
-
-    Returns
-    -------
-    dict with keys: 'knee_pos', 'ankle_pos', 'foot_pos', 'leg_length',
-                    'cannon_angle' (if include_cannon)
+    Returns dict with 'knee_pos', 'ankle_pos', 'foot_pos', 'leg_length',
+    'cannon_angle' (if include_cannon).
     """
-    # Thigh end (= knee position) in hip frame
-    knee_x = L1 * np.sin(theta_hip)
-    knee_z = -L1 * np.cos(theta_hip)
+    l1, l2, l3, _ = get_leg_dims(is_rear)
 
-    # Absolute shank angle
+    knee_x = l1 * np.sin(theta_hip)
+    knee_z = -l1 * np.cos(theta_hip)
+
     shank_angle = theta_hip + theta_knee
-    ankle_x = knee_x + L2 * np.sin(shank_angle)
-    ankle_z = knee_z - L2 * np.cos(shank_angle)
+    ankle_x = knee_x + l2 * np.sin(shank_angle)
+    ankle_z = knee_z - l2 * np.cos(shank_angle)
 
     leg_length = np.sqrt(ankle_x**2 + ankle_z**2)
 
@@ -175,8 +224,8 @@ def forward_kinematics(theta_hip: float, theta_knee: float,
 
     if include_cannon:
         ca = cannon_angle(theta_hip, theta_knee, is_rear=is_rear)
-        foot_x = ankle_x + L3 * np.sin(ca)
-        foot_z = ankle_z - L3 * np.cos(ca)
+        foot_x = ankle_x + l3 * np.sin(ca)
+        foot_z = ankle_z - l3 * np.cos(ca)
         result["foot_pos"] = (foot_x, foot_z)
         result["cannon_angle"] = ca
     else:
@@ -185,50 +234,50 @@ def forward_kinematics(theta_hip: float, theta_knee: float,
     return result
 
 
-# ── Inverse Kinematics ────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  INVERSE KINEMATICS
+# ══════════════════════════════════════════════════════════════════
 
 def inverse_kinematics(foot_x: float, foot_z: float,
-                       elbow_up: bool = False) -> tuple[float, float]:
+                       elbow_up: bool = False,
+                       is_rear: bool = None) -> tuple[float, float]:
     """
-    Compute thigh and knee angles from a desired ankle position in the hip frame.
+    Compute thigh and knee angles from a desired ankle position.
 
-    Solves the 2-link (thigh+shank) IK. The cannon bone angle is then
-    computed separately via cannon_angle_front() or cannon_angle_rear().
+    Uses leg-specific segment lengths when is_rear is specified.
+    If is_rear is None, infers from elbow_up for backward compatibility.
 
-    Parameters
-    ----------
-    foot_x   : Horizontal ankle position (forward positive) [m]
-    foot_z   : Vertical ankle position (downward negative)   [m]
-    elbow_up : True = rear leg (positive knee), False = front leg (negative knee)
-
-    Returns
-    -------
-    (theta_hip, theta_knee) in radians.
-
-    Raises ValueError if target is out of reach.
+    Returns (theta_hip, theta_knee) in radians.
     """
+    if is_rear is None:
+        is_rear = elbow_up
+    l1, l2, _, _ = get_leg_dims(is_rear)
+
     r = np.sqrt(foot_x**2 + foot_z**2)
-    if r > L1 + L2:
+    max_reach = l1 + l2
+    min_reach = abs(l1 - l2)
+
+    if r > max_reach:
         raise ValueError(
             f"Target ({foot_x:.3f}, {foot_z:.3f}) out of reach "
-            f"(dist {r:.3f} > {L1 + L2:.3f} m)."
+            f"(dist {r:.3f} > {max_reach:.3f} m)."
         )
-    if r < abs(L1 - L2):
+    if r < min_reach:
         raise ValueError(
             f"Target ({foot_x:.3f}, {foot_z:.3f}) too close "
-            f"(dist {r:.3f} < {abs(L1 - L2):.3f} m)."
+            f"(dist {r:.3f} < {min_reach:.3f} m)."
         )
 
-    cos_knee = (r**2 - L1**2 - L2**2) / (2 * L1 * L2)
+    cos_knee = (r**2 - l1**2 - l2**2) / (2 * l1 * l2)
     cos_knee = np.clip(cos_knee, -1.0, 1.0)
 
     if elbow_up:
-        theta_knee = np.arccos(cos_knee)     # positive = rear leg hock
+        theta_knee = np.arccos(cos_knee)
     else:
-        theta_knee = -np.arccos(cos_knee)    # negative = front leg carpal
+        theta_knee = -np.arccos(cos_knee)
 
     alpha = np.arctan2(foot_x, -foot_z)
-    beta = np.arcsin(np.clip(L2 * np.sin(abs(theta_knee)) / r, -1.0, 1.0))
+    beta = np.arcsin(np.clip(l2 * np.sin(abs(theta_knee)) / r, -1.0, 1.0))
     if elbow_up:
         theta_hip = alpha - beta
     else:
@@ -237,7 +286,9 @@ def inverse_kinematics(foot_x: float, foot_z: float,
     return theta_hip, theta_knee
 
 
-# ── QDD Motor Utilities ───────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  QDD MOTOR UTILITIES
+# ══════════════════════════════════════════════════════════════════
 
 def joint_power(torque: float, omega: float) -> float:
     """Instantaneous mechanical power at a joint [W]."""

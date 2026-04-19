@@ -9,14 +9,27 @@
 
 A bovine quadruped robot modeled after a Highland Cow, attached to a real horse-drawn carriage. The robot walks using QDD (Quasi-Direct Drive) motors with anatomically accurate bovine leg mechanics including a reciprocal apparatus for the rear legs. The carriage carries batteries, computing, and payload — reducing the need for the robot body to support all that weight.
 
-**Key dimensions:**
+**Carriage dimensions (real measurements):**
 | Parameter | Value |
 |---|---|
-| Body (L×W×H) | 1.40 × 0.60 × 0.40 m |
-| Standing height (hip to ground) | 0.464 m |
-| Leg segments | Thigh 0.20m, Shank 0.18m, Cannon 0.10m |
-| Hoof radius | 0.04 m |
+| Track (side-to-side) | 205 cm |
+| Wheelbase (front-to-back) | 140 cm |
+| Front wheel diameter | 85 cm |
+| Rear wheel diameter | 105 cm |
+
+**Key dimensions (150cm scale):**
+| Parameter | Value |
+|---|---|
+| Body (L×W×H) | 1.80 × 0.80 × 0.55 m |
+| Withers height | 1.50 m |
+| Body center height | 1.08 m |
+| Front hip height | 0.93 m (low on body — scapula) |
+| Rear hip height | 1.20 m (high on body — pelvis) |
+| Front leg segments | Thigh 0.38m, Shank 0.34m, Cannon 0.18m |
+| Rear leg segments | Thigh 0.50m, Shank 0.45m, Cannon 0.22m |
+| Hoof radius | Front 0.05m, Rear 0.06m |
 | Weight distribution | 55% front / 45% rear |
+| Body mass (sim) | 107 kg |
 
 ---
 
@@ -75,14 +88,14 @@ Small hobby/industrial servos for expressive animation. These don't carry struct
 | Component | Mass (kg) | Notes |
 |---|---|---|
 | **Robot body** | | |
-| Body frame (aluminum/steel) | 24.0 | Main structural frame |
+| Body frame (aluminum/steel) | 32.0 | Larger frame at 150cm scale |
 | QDD leg motors (×16) | 15.5 | See §2.1 |
-| Leg structure (×4) | 19.2 | 4 × (2.0 hip + 1.5 thigh_frame + 1.0 shank_frame + 0.5 cannon + 0.3 hoof) |
+| Leg structure (×4 — front/rear differ) | 26.0 | Front: 5.7kg, Rear: 7.3kg per leg |
 | Head/neck assembly | 6.5 | Neck 3.0 + skull 2.0 + jaw 0.3 + servos 0.3 + eyes/lids 0.15 + wiring 0.75 |
-| Body decoration (fur/shell) | 5.0 | Faux fur or lightweight panels |
-| Wiring & misc | 3.0 | Motor cables, connectors, cable management |
+| Body decoration (fur/shell) | 8.0 | Faux fur or lightweight panels (larger body) |
+| Wiring & misc | 4.0 | Motor cables, connectors, cable management |
 | IMU + sensors | 0.5 | IMU, force sensors in feet |
-| **Robot subtotal** | **~73.7 kg** | |
+| **Robot subtotal** | **~92.5 kg** | |
 | | | |
 | **Carriage** | | |
 | Carriage frame | 34.0 | Wooden deck + bench |
@@ -103,7 +116,7 @@ Small hobby/industrial servos for expressive animation. These don't carry struct
 | Networking (WiFi/4G) | 0.3 | |
 | **Electronics subtotal** | **~21.0 kg** | |
 | | | |
-| **GRAND TOTAL** | **~165.7 kg** | Robot + carriage + electronics |
+| **GRAND TOTAL** | **~184.5 kg** | Robot + carriage + electronics |
 
 ---
 
@@ -183,7 +196,7 @@ Small hobby/industrial servos for expressive animation. These don't carry struct
 
 ### With motorized carriage wheels:
 The robot legs **only need to:**
-1. Support the robot body weight (~74 kg on 4 legs)
+1. Support the robot body weight (~107 kg on 4 legs)
 2. Produce walking/trotting gait motion
 3. Handle dynamic forces during gait transitions
 
@@ -196,9 +209,10 @@ The legs **do NOT need to:**
 
 | Scenario | Per-leg torque (knee, static) | Motor needed |
 |---|---|---|
-| Robot only (no carriage) | ~18 Nm | RobStride 04 ✓ (40 Nm cont.) |
-| Robot pulling carriage (unmotorized) | ~35 Nm + traction | RobStride 04 (marginal) |
-| Robot with motorized carriage | ~18 Nm | RobStride 03 possible (~€200 less) |
+| Front leg (no carriage) | ~14 Nm | RobStride 04 ✓ (40 Nm cont.) |
+| Rear leg (no carriage) | ~43 Nm | RobStride 04 (marginal, OK w/ duty cycling) |
+| Robot pulling carriage (unmotorized) | ~55 Nm rear peak | RobStride 04 (within 120 Nm peak) |
+| Robot with motorized carriage | ~43 Nm rear | RobStride 04 recommended |
 
 ### Recommendation:
 Keep RobStride 04 for the prototype — the safety margin is valuable for:
@@ -218,7 +232,9 @@ Consider downgrading to RobStride 03 only after successful full-prototype testin
 - [x] QDD motor model and force analysis
 - [x] Bovine walk + trot gaits
 - [x] Gazebo URDF with articulated head
-- [ ] Carriage URDF with wheel physics
+- [x] Carriage URDF with wheel physics (205cm track, 140cm wheelbase)
+- [x] Scale to 150cm withers height with anatomical body shape
+- [x] Front/rear leg differentiation (different lengths/masses)
 - [ ] Run simulation, record joint torques
 - [ ] Validate motor selection against sim data
 - **Cost: €0** (software only)
@@ -233,15 +249,15 @@ Build one complete leg to validate mechanics, motor control, and joint range.
 | RobStride 04 (knee) | 1 | €500 | €500 |
 | RobStride 02 (cannon) | 1 | €200 | €200 |
 | CAN-bus adapter | 1 | €30 | €30 |
-| Aluminum leg structure | 1 set | €150 | €150 |
-| 3D-printed brackets | 1 set | €50 | €50 |
-| Test stand (frame) | 1 | €100 | €100 |
+| Aluminum leg structure | 1 set | €200 | €200 |
+| 3D-printed brackets | 1 set | €75 | €75 |
+| Test stand (frame) | 1 | €120 | €120 |
 | Power supply (bench, 48V) | 1 | €80 | €80 |
 | Jetson Orin Nano | 1 | €250 | €250 |
 | Misc (wiring, connectors) | — | — | €50 |
-| **Phase 1 Total** | | | **€2,210** |
+| **Phase 1 Total** | | | **€2,355** |
 
-**Goals:** Validate joint ranges, verify torque margins, test reciprocal apparatus mechanism, tune PID controllers, measure actual power consumption.
+**Goals:** Validate joint ranges, verify torque margins, test reciprocal apparatus mechanism, tune PID controllers, measure actual power consumption. At 150cm scale the rear leg is ~1.17m total — test stand must be tall enough.
 
 ### Phase 2: Two-Leg (Half-Body) Prototype
 Build two legs (one front + one rear) on a partial body frame to test walking mechanics.
@@ -249,14 +265,14 @@ Build two legs (one front + one rear) on a partial body frame to test walking me
 | Component | Qty/Notes | Cost |
 |---|---|---|
 | Additional leg motors | 4 (1 more leg set) | €1,500 |
-| Body frame (half) | aluminum extrusion | €300 |
+| Body frame (half) | aluminum extrusion 150cm scale | €450 |
 | 48V battery (small, 10Ah) | 1 | €200 |
 | IMU (BNO085) | 1 | €25 |
 | CAN-bus expansion | 1 | €30 |
 | Foot force sensors | 2 | €10 |
 | Misc | — | €100 |
-| **Phase 2 Total** (incremental) | | **€2,165** |
-| **Phase 2 Running Total** | | **€4,375** |
+| **Phase 2 Total** (incremental) | | **€2,315** |
+| **Phase 2 Running Total** | | **€4,670** |
 
 **Goals:** Test 2-leg walking on a rail/guide, validate front-rear weight transfer, test bovine gait timing, measure ground reaction forces.
 
@@ -266,9 +282,9 @@ Complete the robot with all 4 legs, full body frame, head, and carriage.
 | Component | Qty/Notes | Cost |
 |---|---|---|
 | Remaining 2 leg sets | 8 motors | €3,000 |
-| Full body frame | aluminum/steel | €400 |
+| Full body frame | aluminum/steel (1.80×0.80m) | €600 |
 | Head/neck assembly | servos + structure | €150 |
-| Decoration (faux fur, shell) | — | €200 |
+| Decoration (faux fur, shell) | 150cm scale | €350 |
 | Carriage hub motors (×2) | 350W each | €240 |
 | 48V 20Ah battery | 1 | €350 |
 | Charger + BMS | 1 | €80 |
@@ -277,8 +293,8 @@ Complete the robot with all 4 legs, full body frame, head, and carriage.
 | Remaining sensors | — | €60 |
 | Wiring + cable management | — | €100 |
 | USB camera | 1 | €30 |
-| **Phase 3 Total** (incremental) | | **€4,700** |
-| **Phase 3 Running Total** | | **€9,075** |
+| **Phase 3 Total** (incremental) | | **€5,650** |
+| **Phase 3 Running Total** | | **€10,320** |
 
 ---
 
@@ -287,9 +303,9 @@ Complete the robot with all 4 legs, full body frame, head, and carriage.
 | Phase | Description | Incremental | Running Total |
 |---|---|---|---|
 | Phase 0 | Simulation | €0 | €0 |
-| Phase 1 | Single leg + test stand | €2,210 | €2,210 |
-| Phase 2 | Two legs + half body | €2,165 | €4,375 |
-| Phase 3 | Full quadruped + carriage | €4,700 | €9,075 |
+| Phase 1 | Single leg + test stand | €2,355 | €2,355 |
+| Phase 2 | Two legs + half body | €2,315 | €4,670 |
+| Phase 3 | Full quadruped + carriage | €5,650 | €10,320 |
 | | | | |
 | **Optional extras** | | | |
 | Lidar sensor | obstacle avoidance | €100 | |
@@ -297,7 +313,7 @@ Complete the robot with all 4 legs, full body frame, head, and carriage.
 | LED strips (under body) | event lighting | €30 | |
 | Spare motors | 2× RobStride 04 | €1,000 | |
 
-**Estimated total project cost: €9,075 — €10,245**
+**Estimated total project cost: €10,320 — €11,490** (150cm scale, ~€1,200 more than original 46cm design)
 
 ---
 

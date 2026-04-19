@@ -32,7 +32,9 @@ Highland Cow build — short thick legs, deep crouch stance.
 import math
 import numpy as np
 from robot.kinematics.leg_kinematics import (
-    inverse_kinematics, ANKLE_HEIGHT, L1, L2,
+    inverse_kinematics,
+    ANKLE_HEIGHT_FRONT, ANKLE_HEIGHT_REAR,
+    L1_FRONT, L2_FRONT, L1_REAR, L2_REAR,
     cannon_angle_front, cannon_angle_rear,
 )
 
@@ -50,9 +52,9 @@ WALK = {
     'phase_offsets': {'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
     'swing_frac': 0.30,        # 30% swing / 70% stance (duty factor 0.70)
     'period': 1.1,             # seconds per full stride cycle
-    'step_height_front': 0.06, # front legs lift higher (weight-bearing clearance)
-    'step_height_rear': 0.05,  # rear legs slightly lower arc
-    'min_stride': 0.04,        # minimum stride half-length [m]
+    'step_height_front': 0.08, # front legs lift higher (weight-bearing clearance)
+    'step_height_rear': 0.07,  # rear legs slightly lower arc
+    'min_stride': 0.06,        # minimum stride half-length [m]
     'speed': 0.30,             # target walking speed [m/s]
 }
 
@@ -63,18 +65,17 @@ TROT = {
     'phase_offsets': {'fl': 0.0, 'rr': 0.0, 'fr': 0.50, 'rl': 0.50},
     'swing_frac': 0.50,        # 50% swing / 50% stance (duty factor 0.50)
     'period': 0.70,            # faster cadence for trot
-    'step_height_front': 0.08, # higher clearance needed at trot speed
-    'step_height_rear': 0.07,
-    'min_stride': 0.05,
+    'step_height_front': 0.10, # higher clearance needed at trot speed
+    'step_height_rear': 0.09,
+    'min_stride': 0.07,
     'speed': 0.60,             # target trotting speed [m/s]
 }
 
 GAIT_SEQUENCE = [WALK, TROT]
 
 # ── Gait parameters ───────────────────────────────────────────────
-STEP_LENGTH    = 0.10    # base stride half-length [m]
-BODY_HEIGHT    = ANKLE_HEIGHT  # IK targets ankle, not hoof [m] (~0.324)
-MAX_STEP       = 0.14    # hard cap on stride half-length (within 0.197m reach)
+STEP_LENGTH    = 0.14    # base stride half-length [m] (scaled up)
+MAX_STEP       = 0.22    # hard cap on stride half-length [m]
 
 # ── Overtracking ──────────────────────────────────────────────────
 # Rear hooves land slightly ahead of where the ipsilateral front hoof was
@@ -83,7 +84,8 @@ OVERTRACK_REAR  = 0.01   # rear legs: 1cm forward of front footprint
 
 
 def _swing_trajectory(phase: float, step_height: float,
-                      half_stride: float) -> tuple[float, float]:
+                      half_stride: float,
+                      ankle_height: float) -> tuple[float, float]:
     """
     3-phase bovine swing arc.
 
@@ -93,9 +95,10 @@ def _swing_trajectory(phase: float, step_height: float,
 
     Parameters
     ----------
-    phase       : swing progress [0, 1)
-    step_height : vertical clearance [m]
-    half_stride : horizontal half-stride [m]
+    phase        : swing progress [0, 1)
+    step_height  : vertical clearance [m]
+    half_stride  : horizontal half-stride [m]
+    ankle_height : IK target height for this leg type [m]
 
     Returns (foot_x, foot_z) in hip frame — targeting ankle position.
     """
@@ -103,31 +106,29 @@ def _swing_trajectory(phase: float, step_height: float,
     CARRY_END = 0.70
 
     if phase < LIFT_END:
-        # LIFT: foot rises from liftoff (-half_stride) with sine ramp
         t = phase / LIFT_END
         lift = step_height * math.sin(math.pi * 0.5 * t)
         t_fwd = t * 0.15
         foot_x = -half_stride + 2.0 * half_stride * t_fwd
     elif phase < CARRY_END:
-        # CARRY: foot at peak height, sweeps forward
         t = (phase - LIFT_END) / (CARRY_END - LIFT_END)
         lift = step_height
         t_fwd = 0.15 + t * 0.70
         foot_x = -half_stride + 2.0 * half_stride * t_fwd
     else:
-        # PLANT: foot descends to touchdown (+half_stride) with cosine ramp
         t = (phase - CARRY_END) / (1.0 - CARRY_END)
         lift = step_height * math.cos(math.pi * 0.5 * t)
         t_fwd = 0.85 + t * 0.15
         foot_x = -half_stride + 2.0 * half_stride * t_fwd
 
     foot_x = max(-MAX_STEP, min(MAX_STEP, foot_x))
-    foot_z = -(BODY_HEIGHT - lift)
+    foot_z = -(ankle_height - lift)
 
     return foot_x, foot_z
 
 
-def _stance_trajectory(phase: float, half_stride: float) -> tuple[float, float]:
+def _stance_trajectory(phase: float, half_stride: float,
+                       ankle_height: float) -> tuple[float, float]:
     """
     Stance phase: foot fixed on ground, body moves forward over it.
 
@@ -142,7 +143,7 @@ def _stance_trajectory(phase: float, half_stride: float) -> tuple[float, float]:
     Returns (foot_x, foot_z) in hip frame.
     """
     foot_x = half_stride * (1.0 - 2.0 * phase)
-    foot_z = -(BODY_HEIGHT + 0.015)  # press 15mm into ground for contact
+    foot_z = -(ankle_height + 0.015)  # press 15mm into ground for contact
     return foot_x, foot_z
 
 
@@ -166,6 +167,7 @@ def joint_angles_at_phase(leg: str, global_phase: float,
 
     is_rear = leg in REAR_LEGS
     elbow_up = is_rear
+    ankle_h = ANKLE_HEIGHT_REAR if is_rear else ANKLE_HEIGHT_FRONT
 
     # Get leg-specific parameters
     step_h = gait['step_height_rear'] if is_rear else gait['step_height_front']
@@ -176,20 +178,26 @@ def joint_angles_at_phase(leg: str, global_phase: float,
 
     if local_phase < gait['swing_frac']:
         swing_phase = local_phase / gait['swing_frac']
-        foot_x, foot_z = _swing_trajectory(swing_phase, step_h, half_stride)
+        foot_x, foot_z = _swing_trajectory(swing_phase, step_h, half_stride, ankle_h)
     else:
         stance_phase = (local_phase - gait['swing_frac']) / (1.0 - gait['swing_frac'])
-        foot_x, foot_z = _stance_trajectory(stance_phase, half_stride)
+        foot_x, foot_z = _stance_trajectory(stance_phase, half_stride, ankle_h)
+
+    # Use leg-specific segment lengths for IK
+    l1 = L1_REAR if is_rear else L1_FRONT
+    l2 = L2_REAR if is_rear else L2_FRONT
 
     try:
         theta_hip, theta_knee = inverse_kinematics(foot_x, foot_z,
-                                                   elbow_up=elbow_up)
+                                                   elbow_up=elbow_up,
+                                                   is_rear=is_rear)
     except ValueError:
-        max_reach = L1 + L2
+        max_reach = l1 + l2
         r = math.sqrt(foot_x**2 + foot_z**2)
         scale = 0.90 * max_reach / r
         theta_hip, theta_knee = inverse_kinematics(foot_x * scale, foot_z * scale,
-                                                   elbow_up=elbow_up)
+                                                   elbow_up=elbow_up,
+                                                   is_rear=is_rear)
 
     # Cannon angle: reciprocal apparatus for rear, passive linkage for front
     if is_rear:
