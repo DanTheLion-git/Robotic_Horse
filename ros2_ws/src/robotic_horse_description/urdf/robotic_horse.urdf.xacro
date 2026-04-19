@@ -89,21 +89,21 @@
       <geometry><box size="1.80 0.88 0.75"/></geometry>
       <material name="body_panel"/>
     </visual>
-    <!-- Withers rise (front-top) -->
+    <!-- Withers rise (front — now at -X since robot faces -X) -->
     <visual>
-      <origin xyz="0.50 0 0.475" rpy="0 0 0"/>
+      <origin xyz="-0.50 0 0.475" rpy="0 0 0"/>
       <geometry><box size="0.55 0.78 0.20"/></geometry>
       <material name="body_panel"/>
     </visual>
     <!-- Chest extension (brisket, front-bottom) -->
     <visual>
-      <origin xyz="0.55 0 -0.435" rpy="0 0 0"/>
+      <origin xyz="-0.55 0 -0.435" rpy="0 0 0"/>
       <geometry><box size="0.40 0.72 0.12"/></geometry>
       <material name="body_panel"/>
     </visual>
-    <!-- Rump (back-top, slight rise) -->
+    <!-- Rump (back — now at +X) -->
     <visual>
-      <origin xyz="-0.55 0 0.425" rpy="0 0 0"/>
+      <origin xyz="0.55 0 0.425" rpy="0 0 0"/>
       <geometry><box size="0.40 0.76 0.10"/></geometry>
       <material name="body_panel"/>
     </visual>
@@ -122,14 +122,14 @@
        Head: jaw (open/close), eyes (left/right pan)
        Small servos — total head assembly ~6.5 kg -->
 
-  <!-- Neck yaw — swivel left/right -->
+  <!-- Neck yaw — swivel left/right (head faces -X direction of travel) -->
   <link name="neck_yaw_link">
     <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
   <joint name="neck_yaw_joint" type="revolute">
     <parent link="base_link"/><child link="neck_yaw_link"/>
-    <origin xyz="0.85 0 0.42" rpy="0 0 0"/>
+    <origin xyz="-0.85 0 0.42" rpy="0 0 3.14159"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.6" upper="0.6" effort="15.0" velocity="2.0"/>
     <dynamics damping="2.0" friction="0.5"/>
@@ -607,6 +607,7 @@
 
   <!-- ═══════════════════════════════════════════════════════
        CARRIAGE — vis-à-vis style, hitched to bovine robot
+       Robot faces -X, carriage trails at +X side.
        Kinematic chain:
          base_link → cow_hitch_pitch (revolute, y, ±0.35 rad)
            → shaft_link (U-fork, 2.35m, bars at ±0.50m to clear body)
@@ -645,25 +646,25 @@
     <dynamics damping="1.0" friction="0.1"/>
   </joint>
 
-  <!-- Shaft — U-shaped wooden fork, 2.35m long
+  <!-- Shaft — U-shaped wooden fork, 2.35m long, extending in +X (behind robot)
        Bars at ±0.50m (1.0m apart) to clear 0.88m body width -->
   <link name="shaft_link">
-    <inertial><mass value="15.0"/><origin xyz="-1.175 0 0" rpy="0 0 0"/>
+    <inertial><mass value="15.0"/><origin xyz="1.175 0 0" rpy="0 0 0"/>
       <inertia ixx="0.15" iyy="6.93" izz="7.00" ixy="0" ixz="0" iyz="0"/></inertial>
     <!-- Left shaft bar -->
-    <visual><origin xyz="-1.175 0.50 0" rpy="0 0 0"/>
+    <visual><origin xyz="1.175 0.50 0" rpy="0 0 0"/>
       <geometry><box size="2.35 0.05 0.05"/></geometry><material name="wood"/></visual>
-    <collision><origin xyz="-1.175 0.50 0" rpy="0 0 0"/>
+    <collision><origin xyz="1.175 0.50 0" rpy="0 0 0"/>
       <geometry><box size="2.35 0.05 0.05"/></geometry></collision>
     <!-- Right shaft bar -->
-    <visual><origin xyz="-1.175 -0.50 0" rpy="0 0 0"/>
+    <visual><origin xyz="1.175 -0.50 0" rpy="0 0 0"/>
       <geometry><box size="2.35 0.05 0.05"/></geometry><material name="wood"/></visual>
-    <collision><origin xyz="-1.175 -0.50 0" rpy="0 0 0"/>
+    <collision><origin xyz="1.175 -0.50 0" rpy="0 0 0"/>
       <geometry><box size="2.35 0.05 0.05"/></geometry></collision>
     <!-- Cross piece at carriage end (tapers to ~0.85m) -->
-    <visual><origin xyz="-2.30 0 0" rpy="0 0 0"/>
+    <visual><origin xyz="2.30 0 0" rpy="0 0 0"/>
       <geometry><box size="0.05 0.85 0.05"/></geometry><material name="wood"/></visual>
-    <collision><origin xyz="-2.30 0 0" rpy="0 0 0"/>
+    <collision><origin xyz="2.30 0 0" rpy="0 0 0"/>
       <geometry><box size="0.05 0.85 0.05"/></geometry></collision>
   </link>
 
@@ -671,7 +672,7 @@
        Moderate damping: allows free pitch motion over bumps without oscillation. -->
   <joint name="perch_pitch_joint" type="revolute">
     <parent link="shaft_link"/><child link="front_assembly_link"/>
-    <origin xyz="-2.35 0 0.015" rpy="0 0 0"/>
+    <origin xyz="2.35 0 0.015" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
     <limit lower="-0.35" upper="0.35" effort="0" velocity="2.0"/>
     <dynamics damping="1.5" friction="0.2"/>
@@ -679,29 +680,29 @@
 
   <!-- Front assembly (perch beam + front axle + turntable pin) ~8 kg -->
   <link name="front_assembly_link">
-    <inertial><mass value="8.0"/><origin xyz="-0.25 0 -0.15" rpy="0 0 0"/>
+    <inertial><mass value="8.0"/><origin xyz="0.25 0 -0.15" rpy="0 0 0"/>
       <inertia ixx="0.20" iyy="0.10" izz="0.25" ixy="0" ixz="0" iyz="0"/></inertial>
     <!-- Perch beam (shaft-to-axle connection) -->
-    <visual><origin xyz="-0.25 0 0" rpy="0 0 0"/>
+    <visual><origin xyz="0.25 0 0" rpy="0 0 0"/>
       <geometry><box size="0.50 0.08 0.08"/></geometry><material name="iron"/></visual>
-    <collision><origin xyz="-0.25 0 0" rpy="0 0 0"/>
+    <collision><origin xyz="0.25 0 0" rpy="0 0 0"/>
       <geometry><box size="0.50 0.08 0.08"/></geometry></collision>
     <!-- Front axle bar -->
-    <visual><origin xyz="-0.50 0 -0.37" rpy="0 0 0"/>
+    <visual><origin xyz="0.50 0 -0.37" rpy="0 0 0"/>
       <geometry><box size="0.06 1.40 0.06"/></geometry><material name="iron"/></visual>
-    <collision><origin xyz="-0.50 0 -0.37" rpy="0 0 0"/>
+    <collision><origin xyz="0.50 0 -0.37" rpy="0 0 0"/>
       <geometry><box size="0.06 1.40 0.06"/></geometry></collision>
     <!-- Turntable circle (fifth-wheel plate) -->
-    <visual><origin xyz="-0.50 0 -0.02" rpy="0 0 0"/>
+    <visual><origin xyz="0.50 0 -0.02" rpy="0 0 0"/>
       <geometry><cylinder radius="0.15" length="0.04"/></geometry><material name="iron"/></visual>
-    <collision><origin xyz="-0.50 0 -0.02" rpy="0 0 0"/>
+    <collision><origin xyz="0.50 0 -0.02" rpy="0 0 0"/>
       <geometry><cylinder radius="0.15" length="0.04"/></geometry></collision>
   </link>
 
   <!-- ── Front-Left Wheel (⌀85cm) — on front assembly ── -->
   <joint name="cart_fl_wheel_joint" type="continuous">
     <parent link="front_assembly_link"/><child link="cart_fl_wheel_link"/>
-    <origin xyz="-0.50 0.725 -0.37" rpy="0 0 0"/>
+    <origin xyz="0.50 0.725 -0.37" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
     <dynamics damping="0.5" friction="0.1"/>
   </joint>
@@ -720,7 +721,7 @@
   <!-- ── Front-Right Wheel (⌀85cm) — on front assembly ── -->
   <joint name="cart_fr_wheel_joint" type="continuous">
     <parent link="front_assembly_link"/><child link="cart_fr_wheel_link"/>
-    <origin xyz="-0.50 -0.725 -0.37" rpy="0 0 0"/>
+    <origin xyz="0.50 -0.725 -0.37" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
     <dynamics damping="0.5" friction="0.1"/>
   </joint>
@@ -740,7 +741,7 @@
        The cart body's inertia (140 kg) provides natural stability. -->
   <joint name="turntable_yaw_joint" type="revolute">
     <parent link="front_assembly_link"/><child link="cart_body_link"/>
-    <origin xyz="-0.50 0 0" rpy="0 0 0"/>
+    <origin xyz="0.50 0 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.785" upper="0.785" effort="0" velocity="2.0"/>
     <dynamics damping="4.0" friction="0.3"/>
@@ -754,97 +755,97 @@
   <link name="cart_body_link">
     <!-- Combined inertia: carriage structure 55 kg + driver 85 kg = 140 kg
          COM shifted down to match lowered body position -->
-    <inertial><mass value="140.0"/><origin xyz="-0.90 0 0.07" rpy="0 0 0"/>
+    <inertial><mass value="140.0"/><origin xyz="0.90 0 0.07" rpy="0 0 0"/>
       <inertia ixx="25.0" iyy="95.0" izz="85.0" ixy="0" ixz="0" iyz="0"/></inertial>
 
     <!-- Main body floor/deck — abs z ≈ 0.60m -->
-    <visual><origin xyz="-1.025 0 -0.195" rpy="0 0 0"/>
+    <visual><origin xyz="1.025 0 -0.195" rpy="0 0 0"/>
       <geometry><box size="2.50 1.10 0.06"/></geometry><material name="wood"/></visual>
-    <collision><origin xyz="-1.025 0 -0.195" rpy="0 0 0"/>
+    <collision><origin xyz="1.025 0 -0.195" rpy="0 0 0"/>
       <geometry><box size="2.50 1.10 0.06"/></geometry></collision>
 
     <!-- Left side panel -->
-    <visual><origin xyz="-1.025 0.52 0.195" rpy="0 0 0"/>
+    <visual><origin xyz="1.025 0.52 0.195" rpy="0 0 0"/>
       <geometry><box size="2.20 0.06 0.72"/></geometry><material name="wood"/></visual>
-    <collision><origin xyz="-1.025 0.52 0.195" rpy="0 0 0"/>
+    <collision><origin xyz="1.025 0.52 0.195" rpy="0 0 0"/>
       <geometry><box size="2.20 0.06 0.72"/></geometry></collision>
 
     <!-- Right side panel -->
-    <visual><origin xyz="-1.025 -0.52 0.195" rpy="0 0 0"/>
+    <visual><origin xyz="1.025 -0.52 0.195" rpy="0 0 0"/>
       <geometry><box size="2.20 0.06 0.72"/></geometry><material name="wood"/></visual>
-    <collision><origin xyz="-1.025 -0.52 0.195" rpy="0 0 0"/>
+    <collision><origin xyz="1.025 -0.52 0.195" rpy="0 0 0"/>
       <geometry><box size="2.20 0.06 0.72"/></geometry></collision>
 
-    <!-- Front panel (driver side, kick board) -->
-    <visual><origin xyz="0.05 0 0.145" rpy="0 0 0"/>
+    <!-- Front panel (cow side, kick board) -->
+    <visual><origin xyz="-0.05 0 0.145" rpy="0 0 0"/>
       <geometry><box size="0.06 1.00 0.62"/></geometry><material name="dark_grey"/></visual>
 
     <!-- Rear panel -->
-    <visual><origin xyz="-2.10 0 0.145" rpy="0 0 0"/>
+    <visual><origin xyz="2.10 0 0.145" rpy="0 0 0"/>
       <geometry><box size="0.06 1.00 0.62"/></geometry><material name="dark_grey"/></visual>
 
     <!-- Center divider panel -->
-    <visual><origin xyz="-1.025 0 0.145" rpy="0 0 0"/>
+    <visual><origin xyz="1.025 0 0.145" rpy="0 0 0"/>
       <geometry><box size="0.06 0.90 0.50"/></geometry><material name="dark_grey"/></visual>
 
-    <!-- Front bench seat -->
-    <visual><origin xyz="-0.30 0 0.105" rpy="0 0 0"/>
+    <!-- Front bench seat (driver side, closest to cow) -->
+    <visual><origin xyz="0.30 0 0.105" rpy="0 0 0"/>
       <geometry><box size="0.45 0.90 0.08"/></geometry><material name="red_velvet"/></visual>
     <!-- Front seat backrest -->
-    <visual><origin xyz="-0.08 0 0.325" rpy="0 0 0"/>
+    <visual><origin xyz="0.08 0 0.325" rpy="0 0 0"/>
       <geometry><box size="0.06 0.90 0.36"/></geometry><material name="wood"/></visual>
 
     <!-- Rear bench seat -->
-    <visual><origin xyz="-1.75 0 0.105" rpy="0 0 0"/>
+    <visual><origin xyz="1.75 0 0.105" rpy="0 0 0"/>
       <geometry><box size="0.45 0.90 0.08"/></geometry><material name="red_velvet"/></visual>
     <!-- Rear seat backrest -->
-    <visual><origin xyz="-1.97 0 0.325" rpy="0 0 0"/>
+    <visual><origin xyz="1.97 0 0.325" rpy="0 0 0"/>
       <geometry><box size="0.06 0.90 0.36"/></geometry><material name="wood"/></visual>
 
     <!-- Driver figure (85 kg, seated on front bench) -->
     <!-- Torso -->
-    <visual><origin xyz="-0.30 0 0.465" rpy="0 0 0"/>
+    <visual><origin xyz="0.30 0 0.465" rpy="0 0 0"/>
       <geometry><box size="0.30 0.40 0.55"/></geometry><material name="dark_grey"/></visual>
     <!-- Head -->
-    <visual><origin xyz="-0.30 0 0.815" rpy="0 0 0"/>
+    <visual><origin xyz="0.30 0 0.815" rpy="0 0 0"/>
       <geometry><sphere radius="0.12"/></geometry><material name="light_grey"/></visual>
 
     <!-- Left mudguard / fender (over rear wheels) -->
-    <visual><origin xyz="-1.85 0.58 -0.245" rpy="0 0 0"/>
+    <visual><origin xyz="1.85 0.58 -0.245" rpy="0 0 0"/>
       <geometry><box size="0.70 0.12 0.06"/></geometry><material name="wood"/></visual>
     <!-- Right mudguard -->
-    <visual><origin xyz="-1.85 -0.58 -0.245" rpy="0 0 0"/>
+    <visual><origin xyz="1.85 -0.58 -0.245" rpy="0 0 0"/>
       <geometry><box size="0.70 0.12 0.06"/></geometry><material name="wood"/></visual>
 
     <!-- Iron underframe / chassis rail (left) -->
-    <visual><origin xyz="-1.025 0.40 -0.405" rpy="0 0 0"/>
+    <visual><origin xyz="1.025 0.40 -0.405" rpy="0 0 0"/>
       <geometry><box size="2.60 0.04 0.04"/></geometry><material name="iron"/></visual>
     <!-- Iron underframe / chassis rail (right) -->
-    <visual><origin xyz="-1.025 -0.40 -0.405" rpy="0 0 0"/>
+    <visual><origin xyz="1.025 -0.40 -0.405" rpy="0 0 0"/>
       <geometry><box size="2.60 0.04 0.04"/></geometry><material name="iron"/></visual>
 
     <!-- Left carriage lamp bracket -->
-    <visual><origin xyz="0.15 0.50 0.595" rpy="0 0 0"/>
+    <visual><origin xyz="-0.15 0.50 0.595" rpy="0 0 0"/>
       <geometry><cylinder radius="0.02" length="0.25"/></geometry><material name="iron"/></visual>
     <!-- Left lamp housing -->
-    <visual><origin xyz="0.15 0.54 0.745" rpy="0 0 0"/>
+    <visual><origin xyz="-0.15 0.54 0.745" rpy="0 0 0"/>
       <geometry><box size="0.10 0.10 0.15"/></geometry><material name="iron"/></visual>
     <!-- Right carriage lamp bracket -->
-    <visual><origin xyz="0.15 -0.50 0.595" rpy="0 0 0"/>
+    <visual><origin xyz="-0.15 -0.50 0.595" rpy="0 0 0"/>
       <geometry><cylinder radius="0.02" length="0.25"/></geometry><material name="iron"/></visual>
     <!-- Right lamp housing -->
-    <visual><origin xyz="0.15 -0.54 0.745" rpy="0 0 0"/>
+    <visual><origin xyz="-0.15 -0.54 0.745" rpy="0 0 0"/>
       <geometry><box size="0.10 0.10 0.15"/></geometry><material name="iron"/></visual>
 
     <!-- Folding hood frame (rear, collapsed) -->
-    <visual><origin xyz="-2.05 0 0.645" rpy="0 0 0"/>
+    <visual><origin xyz="2.05 0 0.645" rpy="0 0 0"/>
       <geometry><box size="0.08 0.95 0.15"/></geometry><material name="wood"/></visual>
   </link>
 
   <!-- ── Rear axle (fixed to cart body) ── -->
   <joint name="rear_axle_joint" type="fixed">
     <parent link="cart_body_link"/><child link="rear_axle_link"/>
-    <origin xyz="-2.05 0 -0.27" rpy="0 0 0"/>
+    <origin xyz="2.05 0 -0.27" rpy="0 0 0"/>
   </joint>
   <link name="rear_axle_link">
     <inertial><mass value="6.0"/><origin xyz="0 0 0" rpy="0 0 0"/>

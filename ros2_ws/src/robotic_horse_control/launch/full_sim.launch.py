@@ -3,9 +3,7 @@ full_sim.launch.py  —  Single entry-point for the complete Robotic Horse simul
 
 Starts (in order):
   1. Gazebo Harmonic GUI  + robot spawn + ros2_control controllers
-  2. RViz2 with the Robotic Horse config  (after 4 s, display is ready)
-  3. Gait node  (after 9 s, controllers are active)
-  4. Force / ballscrew marker node  (together with gait node)
+  2. Gait node  (after 9 s, controllers are active)
 
 Usage:
     ros2 launch robotic_horse_control full_sim.launch.py
@@ -23,12 +21,10 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
     pkg_control     = FindPackageShare('robotic_horse_control')
-    pkg_description = FindPackageShare('robotic_horse_description')
 
     # ── 1. Gazebo + controllers ──────────────────────────────────────
     gazebo_launch = IncludeLaunchDescription(
@@ -37,20 +33,7 @@ def generate_launch_description():
         )
     )
 
-    # ── 2. RViz2 ────────────────────────────────────────────────────
-    rviz_config = PathJoinSubstitution(
-        [pkg_description, 'rviz', 'robotic_horse.rviz']
-    )
-    rviz2 = Node(
-        package='rviz2',
-        executable='rviz2',
-        name='rviz2',
-        arguments=['-d', rviz_config],
-        parameters=[{'use_sim_time': True}],
-        output='screen',
-    )
-
-    # ── 3. Blendspace node ───────────────────────────────────────────
+    # ── 2. Blendspace node ───────────────────────────────────────────
     blendspace_node = Node(
         package='robotic_horse_control',
         executable='blendspace_node',
@@ -59,14 +42,12 @@ def generate_launch_description():
         output='screen',
     )
 
-    # (force_node removed — obsolete ballscrew model, incorrect M_BODY=20kg)
+    # (force_node removed — obsolete ballscrew model)
+    # (RViz2 removed — broken display, not needed for simulation)
 
     return LaunchDescription([
         # Gazebo starts immediately
         gazebo_launch,
-
-        # RViz2 after 4 s (Gazebo window is up, robot description available)
-        TimerAction(period=4.0, actions=[rviz2]),
 
         # Blendspace controller after 9 s (controllers active by then)
         TimerAction(period=9.0, actions=[blendspace_node]),
