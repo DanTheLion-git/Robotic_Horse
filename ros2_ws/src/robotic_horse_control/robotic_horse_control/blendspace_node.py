@@ -13,7 +13,7 @@ Bovine Leg Mechanics
 
 QDD Actuation (replaced ballscrew model):
   All joints use quasi-direct-drive motors. Backdrivable, compliant, torque-sensing.
-  Robot mass: ~86 kg (lighter than 100 kg ballscrew estimate).
+  Robot mass: ~107 kg (150 cm Highland Cow).
 
 Weight distribution: 55% front / 45% rear (bovine standard).
 
@@ -34,44 +34,60 @@ from sensor_msgs.msg import JointState, Imu
 from builtin_interfaces.msg import Duration
 
 
-# ── Robot geometry (must match URDF exactly) ─────────────────────────────────
-L1 = 0.20           # thigh  [m]
-L2 = 0.18           # shank  [m]
-L3 = 0.10           # cannon [m]
-CANNON_LEAN = 0.08  # front leg: cannon forward lean [rad]
-FOOT_R = 0.04       # hoof radius [m]
+# ── Robot geometry (150 cm Highland Cow — must match URDF exactly) ────────────
+# Front leg segments
+L1_FRONT = 0.38        # humerus [m]
+L2_FRONT = 0.34        # radius  [m]
+L3_FRONT = 0.18        # cannon  [m]
+FOOT_R_FRONT = 0.05    # hoof radius [m]
+
+# Rear leg segments
+L1_REAR = 0.50         # femur [m]
+L2_REAR = 0.45         # tibia [m]
+L3_REAR = 0.22         # cannon [m]
+FOOT_R_REAR = 0.06     # hoof radius [m]
+
+CANNON_LEAN = 0.08     # front leg: cannon forward lean [rad]
 
 # Reciprocal apparatus coupling (rear legs only — bovine stifle-hock)
 RECIP_RATIO  = 0.85    # coupling ratio (slightly sub-unity like real cattle)
-RECIP_OFFSET = -0.47 + RECIP_RATIO * 1.10  # ≈ 0.465 rad
+RECIP_OFFSET = -0.05 + RECIP_RATIO * 0.505  # ≈ 0.379 rad
 
-# Hip joint (thigh_joint) height from ground at deeply crouched neutral pose.
-BODY_HEIGHT  = 0.464
-ANKLE_HEIGHT = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # = 0.324m
+# Body centre height and per-leg ankle heights
+BODY_HEIGHT  = 1.08    # body centre Z [m]
+ANKLE_HEIGHT_FRONT = L1_FRONT + L2_FRONT - L3_FRONT * math.cos(CANNON_LEAN) - FOOT_R_FRONT  # ≈ 0.70 m
+ANKLE_HEIGHT_REAR  = L1_REAR + L2_REAR - L3_REAR * math.cos(CANNON_LEAN) - FOOT_R_REAR      # ≈ 0.92 m (approx)
+# Override with spec values
+ANKLE_HEIGHT_FRONT = 0.70
+ANKLE_HEIGHT_REAR  = 0.92
+
+# Hip heights above ground (from URDF hip positions on body)
+FRONT_HIP_HEIGHT = 0.93   # m
+REAR_HIP_HEIGHT  = 1.20   # m
 
 # Hip positions in base_link (x=fwd, y=left, z=up)
-# Body: 1.40m L × 0.60m W; hip joints at z=-0.16, x=±0.48, y=±0.24
+# Body: ~1.30m L × 0.80m W; front hip xyz="0.65 ±0.40 -0.15", rear hip xyz="-0.65 ±0.36 0.12"
 LEG_POS = {
-    'fl': ( 0.48,  0.24),
-    'fr': ( 0.48, -0.24),
-    'rl': (-0.48,  0.24),
-    'rr': (-0.48, -0.24),
+    'fl': ( 0.65,  0.40),
+    'fr': ( 0.65, -0.40),
+    'rl': (-0.65,  0.36),
+    'rr': (-0.65, -0.36),
 }
-HALF_BODY_LENGTH = 0.48
+HALF_BODY_LENGTH = 0.65
 
 FRONT_LEGS = ('fl', 'fr')
 REAR_LEGS  = ('rl', 'rr')
 
-# Neutral angles — DEEPLY CROUCHED for compliance and horizontal reach
+# Neutral angles — standing pose for 150 cm Highland Cow
 # Front: passive cannon = CANNON_LEAN - (thigh + knee)
 # Rear:  reciprocal cannon = RECIP_OFFSET - RECIP_RATIO * knee
-NEUTRAL_THIGH_FRONT  = +0.55
-NEUTRAL_KNEE_FRONT   = -1.10
-NEUTRAL_CANNON_FRONT = CANNON_LEAN - (NEUTRAL_THIGH_FRONT + NEUTRAL_KNEE_FRONT)  # +0.63
+NEUTRAL_KNEE_FRONT   = -0.48   # acos(0.890) from IK at ankle_height=0.70
+NEUTRAL_THIGH_FRONT  = +0.22   # alpha + beta
+NEUTRAL_CANNON_FRONT = CANNON_LEAN - (NEUTRAL_THIGH_FRONT + NEUTRAL_KNEE_FRONT)
 
-NEUTRAL_THIGH_REAR   = -0.55
-NEUTRAL_KNEE_REAR    = +1.10
-NEUTRAL_CANNON_REAR  = RECIP_OFFSET - RECIP_RATIO * NEUTRAL_KNEE_REAR  # ≈ -0.47
+NEUTRAL_KNEE_REAR    = +0.51   # acos(0.875) from IK at ankle_height=0.92
+NEUTRAL_THIGH_REAR   = -0.24   # alpha - beta
+NEUTRAL_CANNON_REAR  = RECIP_OFFSET - RECIP_RATIO * NEUTRAL_KNEE_REAR
 
 # ── Bovine gait parameters ─────────────────────────────────────────────────
 # Walk: 4-beat lateral sequence (RL→FL→RR→FR), duty factor 0.70
@@ -79,8 +95,8 @@ NEUTRAL_CANNON_REAR  = RECIP_OFFSET - RECIP_RATIO * NEUTRAL_KNEE_REAR  # ≈ -0.
 WALK = dict(
     phase_offsets={'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
     swing_frac=0.30,
-    step_height_front=0.06,  # front legs lift higher (weight-bearing)
-    step_height_rear=0.05,   # rear legs lower arc (propulsive)
+    step_height_front=0.08,  # front legs lift higher (weight-bearing)
+    step_height_rear=0.07,   # rear legs lower arc (propulsive)
     min_stride=0.04,
     period=1.1,              # ~0.9 Hz stride frequency (bovine walk)
     name='WALK',
@@ -89,8 +105,8 @@ WALK = dict(
 TROT = dict(
     phase_offsets={'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0},
     swing_frac=0.50,
-    step_height_front=0.08,  # higher clearance at trot speed
-    step_height_rear=0.07,
+    step_height_front=0.10,  # higher clearance at trot speed
+    step_height_rear=0.09,
     min_stride=0.05,
     period=0.70,             # ~1.4 Hz stride frequency (bovine trot)
     name='TROT',
@@ -108,7 +124,7 @@ TROT_THRESHOLD = 0.45   # linear.x above this = TROT
 
 # ── Control limits ────────────────────────────────────────────────────────────
 MAX_SHOULDER = 0.20   # rad  max hip Z-yaw
-MAX_STEP     = 0.14   # m    hard cap on stride half-length (well within 0.197m reach)
+MAX_STEP     = 0.22   # m    hard cap on stride half-length
 
 # Pitch-adaptive step height: lx * sin(pitch) * this scale added to each leg.
 # Front legs (lx>0): lean forward → step HIGHER. Rear (lx<0): lean forward → lower.
@@ -146,13 +162,13 @@ def _ik_3d_front(fx: float, fy: float, fz: float):
     fz_2d = fz
 
     r     = math.sqrt(fx_2d**2 + fz_2d**2)
-    r     = max(abs(L1 - L2) + 0.001, min(r, L1 + L2 - 0.001))
-    cos_k = (r**2 - L1**2 - L2**2) / (2.0 * L1 * L2)
+    r     = max(abs(L1_FRONT - L2_FRONT) + 0.001, min(r, L1_FRONT + L2_FRONT - 0.001))
+    cos_k = (r**2 - L1_FRONT**2 - L2_FRONT**2) / (2.0 * L1_FRONT * L2_FRONT)
     cos_k = max(-1.0, min(1.0, cos_k))
 
     knee   = -math.acos(cos_k)
     alpha  = math.atan2(fx_2d, -fz_2d)
-    beta   = math.asin(max(-1.0, min(1.0, L2 * math.sin(abs(knee)) / r)))
+    beta   = math.asin(max(-1.0, min(1.0, L2_FRONT * math.sin(abs(knee)) / r)))
     thigh  = alpha + beta
     # Front leg: passive parallelogram linkage keeps cannon near-vertical
     cannon = CANNON_LEAN - (thigh + knee)
@@ -171,13 +187,13 @@ def _ik_3d_rear(fx: float, fy: float, fz: float):
     fz_2d = fz
 
     r     = math.sqrt(fx_2d**2 + fz_2d**2)
-    r     = max(abs(L1 - L2) + 0.001, min(r, L1 + L2 - 0.001))
-    cos_k = (r**2 - L1**2 - L2**2) / (2.0 * L1 * L2)
+    r     = max(abs(L1_REAR - L2_REAR) + 0.001, min(r, L1_REAR + L2_REAR - 0.001))
+    cos_k = (r**2 - L1_REAR**2 - L2_REAR**2) / (2.0 * L1_REAR * L2_REAR)
     cos_k = max(-1.0, min(1.0, cos_k))
 
     knee   = +math.acos(cos_k)
     alpha  = math.atan2(fx_2d, -fz_2d)
-    beta   = math.asin(max(-1.0, min(1.0, L2 * math.sin(knee) / r)))
+    beta   = math.asin(max(-1.0, min(1.0, L2_REAR * math.sin(knee) / r)))
     thigh  = alpha - beta
     # Rear leg: reciprocal apparatus couples stifle (knee) to hock (cannon)
     cannon = RECIP_OFFSET - RECIP_RATIO * knee
@@ -339,7 +355,7 @@ class BlendspaceNode(Node):
         self.get_logger().info('  QDD actuation model, 55/45 weight distribution')
         self.get_logger().info('  WALK: 4-beat lateral (T=1.1s)  TROT: diagonal (T=0.7s)')
         self.get_logger().info('  W = WALK  |  W again = TROT  |  S = step back  |  SPACE = IDLE')
-        self.get_logger().info('  Body mass: ~86 kg (QDD motors+frame+decoration)')
+        self.get_logger().info('  Body mass: ~107 kg (150 cm Highland Cow, QDD motors+frame+decoration)')
         self.get_logger().info('=' * 60)
 
     # ── Callbacks ──────────────────────────────────────────────────────────
@@ -398,10 +414,10 @@ class BlendspaceNode(Node):
         pitch_adj = math.tan(-pitch) * HALF_BODY_LENGTH
         pitch_adj = max(-0.20, min(0.20, pitch_adj))
         ankle_heights = {
-            'fl': ANKLE_HEIGHT + pitch_adj,
-            'fr': ANKLE_HEIGHT + pitch_adj,
-            'rl': ANKLE_HEIGHT - pitch_adj,
-            'rr': ANKLE_HEIGHT - pitch_adj,
+            'fl': ANKLE_HEIGHT_FRONT + pitch_adj,
+            'fr': ANKLE_HEIGHT_FRONT + pitch_adj,
+            'rl': ANKLE_HEIGHT_REAR - pitch_adj,
+            'rr': ANKLE_HEIGHT_REAR - pitch_adj,
         }
 
         # Bidirectional pitch-adaptive step heights (front/rear differentiated)

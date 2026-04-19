@@ -17,7 +17,11 @@ from robot.gait.walk_gait import generate_gait_trajectory, LEG_NAMES, WALK, TROT
 from robot.kinematics.force_calculator import (
     analyse_gait_forces, M_BODY, QDD_SPECS, weight_per_leg,
 )
-from robot.kinematics.leg_kinematics import L1, L2, L3, BODY_HEIGHT, ANKLE_HEIGHT
+from robot.kinematics.leg_kinematics import (
+    L1_FRONT, L2_FRONT, L3_FRONT, L1_REAR, L2_REAR, L3_REAR,
+    BODY_HEIGHT, ANKLE_HEIGHT, ANKLE_HEIGHT_FRONT, ANKLE_HEIGHT_REAR,
+    FRONT_HIP_HEIGHT, REAR_HIP_HEIGHT,
+)
 
 
 def plot_force_analysis(gait_data: dict) -> None:
@@ -61,8 +65,10 @@ def print_analysis_summary(gait_data: dict) -> None:
     print("\n" + "=" * 72)
     print("  HIGHLAND COW — QDD FORCE ANALYSIS (Bovine Leg Mechanics)")
     print(f"  Body mass : {M_BODY} kg      Gravity: 9.81 m/s²")
-    print(f"  Leg dims  : L1={L1} m (thigh)  L2={L2} m (shank)  L3={L3} m (cannon)")
-    print(f"  Hip height: {BODY_HEIGHT:.3f} m   Ankle height: {ANKLE_HEIGHT:.3f} m")
+    print(f"  Front leg : L1={L1_FRONT} m (humerus)  L2={L2_FRONT} m (radius)  L3={L3_FRONT} m (cannon)")
+    print(f"  Rear leg  : L1={L1_REAR} m (femur)    L2={L2_REAR} m (tibia)   L3={L3_REAR} m (cannon)")
+    print(f"  Front hip : {FRONT_HIP_HEIGHT:.3f} m   Ankle: {ANKLE_HEIGHT_FRONT:.3f} m")
+    print(f"  Rear hip  : {REAR_HIP_HEIGHT:.3f} m   Ankle: {ANKLE_HEIGHT_REAR:.3f} m")
     print(f"  Weight distribution: 55% front / 45% rear (bovine)")
     print(f"  Front leg GRF: {weight_per_leg(True):.1f} N   Rear leg GRF: {weight_per_leg(False):.1f} N")
     print("=" * 72)

@@ -36,19 +36,29 @@ OUT_DIR = os.path.join(
     "ros2_ws", "src", "robotic_horse_control", "animations",
 )
 
-# ── Shared constants (Highland Cow) ──────────────────────────────
-L1           = 0.20
-L2           = 0.18
-L3           = 0.10
+# ── Shared constants (150 cm Highland Cow) ───────────────────────
+# Front leg segments
+L1_FRONT     = 0.38
+L2_FRONT     = 0.34
+L3_FRONT     = 0.18
+FOOT_R_FRONT = 0.05
+
+# Rear leg segments
+L1_REAR      = 0.50
+L2_REAR      = 0.45
+L3_REAR      = 0.22
+FOOT_R_REAR  = 0.06
+
 CANNON_LEAN  = 0.08
-FOOT_R       = 0.04
-BODY_HEIGHT  = 0.464  # hip-to-ground
-ANKLE_HEIGHT = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # ~0.324
-BODY_WIDTH   = 0.48   # 2 × 0.24 m lateral hip offset
+BODY_HEIGHT  = 1.08   # body centre Z [m]
+ANKLE_HEIGHT_FRONT = 0.70   # front ankle-to-hip [m]
+ANKLE_HEIGHT_REAR  = 0.92   # rear ankle-to-hip [m]
+BODY_WIDTH   = 0.80   # 2 × 0.40 m lateral hip offset
 N_FRAMES     = 60     # frames per animation
 DURATION     = 1.0    # seconds per full gait cycle
 SWING_FRAC   = 0.40
-MAX_STEP     = 0.14   # hard cap on stride half-length
+MAX_STEP     = 0.22   # hard cap on stride half-length
+STEP_LENGTH  = 0.14
 
 JOINT_NAMES = [
     "fl_hip_joint", "fl_thigh_joint", "fl_knee_joint", "fl_cannon_joint",
@@ -67,7 +77,7 @@ REAR_LEGS  = ("rl", "rr")
 
 # Reciprocal apparatus (rear legs)
 RECIP_RATIO  = 0.85
-RECIP_OFFSET = -0.47 + RECIP_RATIO * 1.10  # ≈ 0.465
+RECIP_OFFSET = -0.05 + RECIP_RATIO * 0.505  # ≈ 0.379
 
 
 def _cannon_angle(leg: str, thigh: float, knee: float) -> float:
@@ -80,8 +90,10 @@ def _cannon_angle(leg: str, thigh: float, knee: float) -> float:
 # ── Foot trajectory helpers ─────────────────────────────────────────
 
 def foot_target(leg: str, phase: float, step_length: float, step_height: float,
-                body_height: float = ANKLE_HEIGHT, phase_offsets=None):
+                body_height: float = None, phase_offsets=None):
     """Return (foot_x, foot_z) targeting the ankle for a given leg at a gait phase."""
+    if body_height is None:
+        body_height = ANKLE_HEIGHT_REAR if leg in REAR_LEGS else ANKLE_HEIGHT_FRONT
     offsets = phase_offsets or WALK_PHASE
     local = (phase - offsets[leg]) % 1.0
     if local < SWING_FRAC:
@@ -97,7 +109,12 @@ def foot_target(leg: str, phase: float, step_length: float, step_height: float,
     return x, z
 
 
-def ik_safe(foot_x: float, foot_z: float):
+def ik_safe(foot_x: float, foot_z: float, leg: str = 'fl'):
+    """IK with leg-specific dimensions and clamping."""
+    if leg in REAR_LEGS:
+        L1, L2, ank_h = L1_REAR, L2_REAR, ANKLE_HEIGHT_REAR
+    else:
+        L1, L2, ank_h = L1_FRONT, L2_FRONT, ANKLE_HEIGHT_FRONT
     r = math.sqrt(foot_x**2 + foot_z**2)
     max_r = L1 + L2 - 0.01
     if r > max_r:
@@ -106,13 +123,13 @@ def ik_safe(foot_x: float, foot_z: float):
     try:
         return inverse_kinematics(foot_x, foot_z)
     except ValueError:
-        return inverse_kinematics(0.0, -ANKLE_HEIGHT)
+        return inverse_kinematics(0.0, -ank_h)
 
 
 # ── Per-leg step lengths for differential gait ─────────────────────
 
 def leg_step_lengths(speed: float, angular_rate: float,
-                     base_step: float = 0.10):
+                     base_step: float = STEP_LENGTH):
     """
     Compute effective step length per leg for a given speed + angular rate.
     angular_rate > 0 → turn right (right legs shorter, left longer)
@@ -140,7 +157,8 @@ def build_idle(n_frames: int = N_FRAMES):
         bob = 0.010 * math.sin(2 * math.pi * phase)   # ±10 mm
         row = []
         for leg in ("fl", "fr", "rl", "rr"):
-            th, tk = ik_safe(0.0, -(ANKLE_HEIGHT + bob))
+            ank_h = ANKLE_HEIGHT_REAR if leg in REAR_LEGS else ANKLE_HEIGHT_FRONT
+            th, tk = ik_safe(0.0, -(ank_h + bob), leg=leg)
             cannon = _cannon_angle(leg, th, tk)
             row += [0.0, th, tk, cannon]
         frames.append(row)
@@ -148,8 +166,8 @@ def build_idle(n_frames: int = N_FRAMES):
 
 
 def build_parametric(speed: float, angular_rate: float,
-                      step_height_front: float = 0.06,
-                      step_height_rear: float = 0.05,
+                      step_height_front: float = 0.08,
+                      step_height_rear: float = 0.07,
                       n_frames: int = N_FRAMES,
                       phase_offsets=None):
     """General gait with differential step lengths and front/rear step heights."""
@@ -161,7 +179,7 @@ def build_parametric(speed: float, angular_rate: float,
         for leg in ("fl", "fr", "rl", "rr"):
             sh = step_height_rear if leg in REAR_LEGS else step_height_front
             fx, fz = foot_target(leg, phase, sl[leg], sh, phase_offsets=phase_offsets)
-            th, tk = ik_safe(fx, fz)
+            th, tk = ik_safe(fx, fz, leg=leg)
             cannon = _cannon_angle(leg, th, tk)
             row += [0.0, th, tk, cannon]
         frames.append(row)
@@ -186,8 +204,9 @@ def build_turn(angular_rate: float, n_frames: int = N_FRAMES):
                 leg_phase = phase if side == "left" else (phase + 0.5) % 1.0
             else:
                 leg_phase = phase if side == "right" else (phase + 0.5) % 1.0
-            fx, fz = foot_target(leg, leg_phase, stride_inner, 0.05)
-            th, tk = ik_safe(fx, fz)
+            sh = 0.07 if leg in REAR_LEGS else 0.08
+            fx, fz = foot_target(leg, leg_phase, stride_inner, sh)
+            th, tk = ik_safe(fx, fz, leg=leg)
             cannon = _cannon_angle(leg, th, tk)
             row += [0.0, th, tk, cannon]
         frames.append(row)

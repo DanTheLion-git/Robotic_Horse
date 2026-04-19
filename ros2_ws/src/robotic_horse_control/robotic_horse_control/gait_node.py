@@ -21,26 +21,35 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 
 
-# ── Highland Cow geometry (must match URDF xacro) ──────────────────────────
-L1 = 0.20          # thigh length [m]
-L2 = 0.18          # shank length [m]
-L3 = 0.10          # cannon bone length [m]
-CANNON_LEAN = 0.08 # front leg: cannon forward lean [rad]
-FOOT_R = 0.04      # hoof radius [m]
+# ── Highland Cow geometry — 150 cm (must match URDF xacro) ─────────────────
+# Front leg segments
+L1_FRONT = 0.38        # humerus [m]
+L2_FRONT = 0.34        # radius  [m]
+L3_FRONT = 0.18        # cannon  [m]
+FOOT_R_FRONT = 0.05    # hoof radius [m]
+
+# Rear leg segments
+L1_REAR = 0.50         # femur [m]
+L2_REAR = 0.45         # tibia [m]
+L3_REAR = 0.22         # cannon [m]
+FOOT_R_REAR = 0.06     # hoof radius [m]
+
+CANNON_LEAN = 0.08     # front leg: cannon forward lean [rad]
 
 # Reciprocal apparatus (rear legs)
 RECIP_RATIO  = 0.85
-RECIP_OFFSET = -0.47 + RECIP_RATIO * 1.10  # ≈ 0.465
+RECIP_OFFSET = -0.05 + RECIP_RATIO * 0.505  # ≈ 0.379
 
-BODY_HEIGHT   = 0.464
-ANKLE_HEIGHT  = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # ~0.324m
+BODY_HEIGHT        = 1.08
+ANKLE_HEIGHT_FRONT = 0.70   # front ankle-to-hip height [m]
+ANKLE_HEIGHT_REAR  = 0.92   # rear ankle-to-hip height [m]
 
 # Bovine walk gait parameters
-STEP_LENGTH   = 0.10
-STEP_HEIGHT_FRONT = 0.06
-STEP_HEIGHT_REAR  = 0.05
-SWING_FRAC    = 0.30   # 30% swing / 70% stance (bovine walk duty factor)
-MAX_STEP      = 0.14
+STEP_LENGTH       = 0.14
+STEP_HEIGHT_FRONT = 0.08
+STEP_HEIGHT_REAR  = 0.07
+SWING_FRAC        = 0.30   # 30% swing / 70% stance (bovine walk duty factor)
+MAX_STEP          = 0.22
 
 # 4-beat lateral sequence: RL → FL → RR → FR
 PHASE_OFFSET = {'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75}
@@ -56,7 +65,7 @@ FRONT_LEGS = ('fl', 'fr')
 REAR_LEGS  = ('rl', 'rr')
 
 
-def _ik(foot_x: float, foot_z: float, elbow_up: bool = False):
+def _ik(foot_x: float, foot_z: float, L1: float, L2: float, elbow_up: bool = False):
     """2-link IK targeting ankle. Returns (theta_hip, theta_knee)."""
     r = math.sqrt(foot_x**2 + foot_z**2)
     r = max(abs(L1 - L2) + 0.001, min(r, L1 + L2 - 0.001))
@@ -85,6 +94,7 @@ def _foot_target(leg: str, phase: float):
     """Return (foot_x, foot_z) in hip frame for a given gait phase."""
     is_rear = leg in REAR_LEGS
     step_h = STEP_HEIGHT_REAR if is_rear else STEP_HEIGHT_FRONT
+    ankle_h = ANKLE_HEIGHT_REAR if is_rear else ANKLE_HEIGHT_FRONT
 
     local = (phase - PHASE_OFFSET[leg]) % 1.0
     if local < SWING_FRAC:
@@ -106,14 +116,14 @@ def _foot_target(leg: str, phase: float):
             t_fwd = 0.85 + t * 0.15
         x = -STEP_LENGTH / 2 + STEP_LENGTH * t_fwd
         x = max(-MAX_STEP, min(MAX_STEP, x))
-        z = -(ANKLE_HEIGHT - lift)
+        z = -(ankle_h - lift)
     else:
         # Stance: foot on ground, body advances
         p = (local - SWING_FRAC) / (1.0 - SWING_FRAC)
         half = STEP_LENGTH / 2
         x = half * (1.0 - 2.0 * p)
         x = max(-MAX_STEP, min(MAX_STEP, x))
-        z = -(ANKLE_HEIGHT + 0.015)  # press 15mm for contact
+        z = -(ankle_h + 0.015)  # press 15mm for contact
     return x, z
 
 
@@ -145,7 +155,10 @@ class GaitNode(Node):
             for leg in ('fl', 'fr', 'rl', 'rr'):
                 fx, fz = _foot_target(leg, phase)
                 elbow_up = leg in REAR_LEGS
-                th, tk = _ik(fx, fz, elbow_up=elbow_up)
+                if leg in REAR_LEGS:
+                    th, tk = _ik(fx, fz, L1_REAR, L2_REAR, elbow_up=True)
+                else:
+                    th, tk = _ik(fx, fz, L1_FRONT, L2_FRONT, elbow_up=False)
                 cannon = _cannon(leg, th, tk)
                 positions += [0.0, th, tk, cannon]
 
