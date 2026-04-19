@@ -2,29 +2,11 @@
 <!--
   Robotic Horse — Gazebo / ROS2 URDF
   ===================================
-  This is the Gazebo-compatible version of the robot description.
-  It extends the base URDF with:
-    • <ros2_control> hardware interface tags  (8 controlled joints)
-    • <gazebo> plugin tag  (loads gazebo_ros2_control)
-    • <gazebo> material + contact tags per link
+  ⚠️  DEPRECATED: This static URDF is no longer used.
+  The Gazebo simulation uses robotic_horse.urdf.xacro (processed by xacro at launch).
+  See gazebo.launch.py for the active launch configuration.
 
-  Leg layout (top view):
-      FL ---- FR
-      |        |
-      RL ---- RR
-
-  Controlled joints (8 total):
-      {fl,fr,rl,rr}_thigh_joint  — hip flexion/extension  (position ctrl)
-      {fl,fr,rl,rr}_knee_joint   — knee driven by ballscrew (position ctrl)
-
-  Fixed joints (set at 0, no actuator needed for cart-supported robot):
-      {fl,fr,rl,rr}_hip_joint    — lateral hip bracket
-
-  Physical parameters (edit here and in ros2_control.yaml):
-    Body mass  : 20 kg
-    Thigh      : 0.45 m,  1.5 kg
-    Shank      : 0.50 m,  1.0 kg
-    Foot sphere: r=0.04 m, 0.2 kg
+  This file is kept for reference only. Do NOT edit — update the .xacro instead.
 -->
 <robot name="robotic_horse">
 

@@ -36,20 +36,25 @@ OUT_DIR = os.path.join(
     "ros2_ws", "src", "robotic_horse_control", "animations",
 )
 
-# ── Shared constants ────────────────────────────────────────────────
-L1           = 0.45
-L2           = 0.50
-BODY_HEIGHT  = 0.90
-BODY_WIDTH   = 0.36   # 2 × 0.18 m lateral hip offset
+# ── Shared constants (Highland Cow) ──────────────────────────────
+L1           = 0.20
+L2           = 0.18
+L3           = 0.10
+CANNON_LEAN  = 0.08
+FOOT_R       = 0.04
+BODY_HEIGHT  = 0.464  # hip-to-ground
+ANKLE_HEIGHT = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # ~0.324
+BODY_WIDTH   = 0.48   # 2 × 0.24 m lateral hip offset
 N_FRAMES     = 60     # frames per animation
 DURATION     = 1.0    # seconds per full gait cycle
 SWING_FRAC   = 0.40
+MAX_STEP     = 0.14   # hard cap on stride half-length
 
 JOINT_NAMES = [
-    "fl_thigh_joint", "fl_knee_joint",
-    "fr_thigh_joint", "fr_knee_joint",
-    "rl_thigh_joint", "rl_knee_joint",
-    "rr_thigh_joint", "rr_knee_joint",
+    "fl_hip_joint", "fl_thigh_joint", "fl_knee_joint", "fl_cannon_joint",
+    "fr_hip_joint", "fr_thigh_joint", "fr_knee_joint", "fr_cannon_joint",
+    "rl_hip_joint", "rl_thigh_joint", "rl_knee_joint", "rl_cannon_joint",
+    "rr_hip_joint", "rr_thigh_joint", "rr_knee_joint", "rr_cannon_joint",
 ]
 
 # Trot phase offsets: FL+RR move together, FR+RL move together
@@ -59,16 +64,18 @@ PHASE_OFFSET = {"fl": 0.0, "fr": 0.5, "rl": 0.5, "rr": 0.0}
 # ── Foot trajectory helpers ─────────────────────────────────────────
 
 def foot_target(leg: str, phase: float, step_length: float, step_height: float,
-                body_height: float = BODY_HEIGHT):
-    """Return (foot_x, foot_z) for a given leg at a gait phase."""
+                body_height: float = ANKLE_HEIGHT):
+    """Return (foot_x, foot_z) targeting the ankle for a given leg at a gait phase."""
     local = (phase - PHASE_OFFSET[leg]) % 1.0
     if local < SWING_FRAC:
         p = local / SWING_FRAC
         x = -step_length / 2 + step_length * p
+        x = max(-MAX_STEP, min(MAX_STEP, x))
         z = -(body_height - step_height * math.sin(math.pi * p))
     else:
         p = (local - SWING_FRAC) / (1.0 - SWING_FRAC)
         x = step_length / 2 - step_length * p
+        x = max(-MAX_STEP, min(MAX_STEP, x))
         z = -body_height
     return x, z
 
@@ -82,13 +89,13 @@ def ik_safe(foot_x: float, foot_z: float):
     try:
         return inverse_kinematics(foot_x, foot_z)
     except ValueError:
-        return inverse_kinematics(0.0, -BODY_HEIGHT)
+        return inverse_kinematics(0.0, -ANKLE_HEIGHT)
 
 
 # ── Per-leg step lengths for differential gait ─────────────────────
 
 def leg_step_lengths(speed: float, angular_rate: float,
-                     base_step: float = 0.20):
+                     base_step: float = 0.10):
     """
     Compute effective step length per leg for a given speed + angular rate.
     angular_rate > 0 → turn right (right legs shorter, left longer)
@@ -107,23 +114,24 @@ def leg_step_lengths(speed: float, angular_rate: float,
 
 def build_idle(n_frames: int = N_FRAMES):
     """
-    Static standing pose with a gentle vertical body-bob (±15 mm).
+    Static standing pose with a gentle vertical body-bob (±10 mm).
     Produced by slightly varying the knee angle over a slow period.
     """
     frames = []
     for i in range(n_frames):
         phase = i / n_frames
-        bob = 0.015 * math.sin(2 * math.pi * phase)   # ±15 mm
+        bob = 0.010 * math.sin(2 * math.pi * phase)   # ±10 mm
         row = []
         for leg in ("fl", "fr", "rl", "rr"):
-            th, tk = ik_safe(0.0, -(BODY_HEIGHT + bob))
-            row += [th, tk]
+            th, tk = ik_safe(0.0, -(ANKLE_HEIGHT + bob))
+            cannon = CANNON_LEAN - (th + tk)
+            row += [0.0, th, tk, cannon]  # hip_yaw=0
         frames.append(row)
     return frames
 
 
 def build_parametric(speed: float, angular_rate: float,
-                      step_height: float = 0.12,
+                      step_height: float = 0.06,
                       n_frames: int = N_FRAMES):
     """General trot gait with differential step lengths."""
     sl = leg_step_lengths(speed, angular_rate)
@@ -134,7 +142,8 @@ def build_parametric(speed: float, angular_rate: float,
         for leg in ("fl", "fr", "rl", "rr"):
             fx, fz = foot_target(leg, phase, sl[leg], step_height)
             th, tk = ik_safe(fx, fz)
-            row += [th, tk]
+            cannon = CANNON_LEAN - (th + tk)
+            row += [0.0, th, tk, cannon]  # hip_yaw=0
         frames.append(row)
     return frames
 
@@ -146,11 +155,8 @@ def build_turn(angular_rate: float, n_frames: int = N_FRAMES):
     of the wheel-like rotation.  Left/right sides move in opposite directions.
     """
     half_w = BODY_WIDTH / 2
-    # Tangential stride for each side
-    stride_inner = abs(angular_rate) * half_w * 0.8   # scale to sensible distance
+    stride_inner = abs(angular_rate) * half_w * 0.8
     frames = []
-    # angular_rate > 0 → turn right: right legs step backward, left legs forward
-    # We achieve this by phase-inverting the inner legs
     for i in range(n_frames):
         phase = i / n_frames
         row = []
@@ -160,9 +166,10 @@ def build_turn(angular_rate: float, n_frames: int = N_FRAMES):
                 leg_phase = phase if side == "left" else (phase + 0.5) % 1.0
             else:
                 leg_phase = phase if side == "right" else (phase + 0.5) % 1.0
-            fx, fz = foot_target(leg, leg_phase, stride_inner, 0.08)
+            fx, fz = foot_target(leg, leg_phase, stride_inner, 0.05)
             th, tk = ik_safe(fx, fz)
-            row += [th, tk]
+            cannon = CANNON_LEAN - (th + tk)
+            row += [0.0, th, tk, cannon]  # hip_yaw=0
         frames.append(row)
     return frames
 

@@ -41,12 +41,15 @@ from robot.kinematics.leg_kinematics import (
 )
 
 
-# ── Robot mass parameters ──────────────────────────────────────────
+# ── Robot mass parameters (Highland Cow build) ────────────────────
 G = 9.81            # gravitational acceleration  [m/s²]
-M_BODY   = 20.0     # body frame mass  [kg]
-M_THIGH  = 1.5      # upper-leg tube + motor mass per leg  [kg]
-M_SHANK  = 1.0      # lower-leg tube mass per leg  [kg]
-M_FOOT   = 0.2      # foot sphere mass per leg  [kg]
+M_BODY   = 100.0    # body frame mass (motors 48 + frame 24 + electronics 8
+                     #   + decoration 35 + legs 5)  [kg]
+M_HIP    = 4.0      # hip bracket mass per leg  [kg]
+M_THIGH  = 6.0      # upper-leg tube + motor mass per leg  [kg]
+M_SHANK  = 5.0      # lower-leg tube mass per leg  [kg]
+M_CANNON = 1.2      # cannon bone per leg  [kg]
+M_FOOT   = 0.4      # hoof sphere mass per leg  [kg]
 NUM_LEGS = 4
 
 # ── Ballscrew / motor parameters ───────────────────────────────────
@@ -87,8 +90,9 @@ def knee_torque_static(
     shank_angle = theta_hip + theta_knee   # absolute angle of shank from vertical
 
     # Gravity torques about the knee pivot (horizontal moment arm of each mass)
-    tau_shank = M_SHANK * G * (L2 / 2) * abs(np.sin(shank_angle))
-    tau_foot  = M_FOOT  * G *  L2      * abs(np.sin(shank_angle))
+    tau_shank  = M_SHANK  * G * (L2 / 2) * abs(np.sin(shank_angle))
+    tau_cannon = M_CANNON * G *  L2       * abs(np.sin(shank_angle))
+    tau_foot   = M_FOOT   * G *  L2       * abs(np.sin(shank_angle))
 
     tau_grf = 0.0
     if include_grf:
@@ -100,11 +104,11 @@ def knee_torque_static(
         moment_arm  = abs(foot_x - knee_x)
 
         # Vertical load this leg carries: ¼ body + full leg mass stack
-        vertical_load = (body_mass / NUM_LEGS + M_THIGH + M_SHANK + M_FOOT) * G
+        vertical_load = (body_mass / NUM_LEGS + M_HIP + M_THIGH + M_SHANK + M_CANNON + M_FOOT) * G
 
         tau_grf = vertical_load * moment_arm
 
-    return tau_shank + tau_foot + tau_grf
+    return tau_shank + tau_cannon + tau_foot + tau_grf
 
 
 def nut_force_required(

@@ -1,5 +1,5 @@
 """
-Trot gait planner for the quadruped.
+Trot gait planner for the Highland Cow quadruped.
 
 A trot moves diagonal leg pairs simultaneously:
   Phase 0: FL + RR swing,  FR + RL stance
@@ -12,17 +12,19 @@ Each leg cycles through:
   LOWER   – knee extends (lowers foot to ground)
 
 Joint angle trajectories are parameterised by phase [0, 1).
+
+Highland Cow build — short thick legs, deep crouch stance.
 """
 
 import numpy as np
-from robot.kinematics.leg_kinematics import inverse_kinematics
+from robot.kinematics.leg_kinematics import inverse_kinematics, ANKLE_HEIGHT
 
 
-# ── Gait parameters ────────────────────────────────────────────────
-STEP_LENGTH   = 0.20    # stride length  [m]
-STEP_HEIGHT   = 0.12    # foot lift height  [m]
-BODY_HEIGHT   = 0.90    # nominal hip-to-ground distance  [m]
-SWING_FRACTION = 0.40   # fraction of gait cycle spent swinging
+# ── Gait parameters (Highland Cow) ────────────────────────────────
+STEP_LENGTH    = 0.10    # stride length [m] — conservative for short legs
+STEP_HEIGHT    = 0.06    # foot lift height [m]
+BODY_HEIGHT    = ANKLE_HEIGHT  # IK targets ankle, not hoof  [m] (~0.324)
+SWING_FRACTION = 0.40    # fraction of gait cycle spent swinging
 
 LEG_NAMES = ["fl", "fr", "rl", "rr"]
 
@@ -40,6 +42,9 @@ PHASE_OFFSET = {
     "rl": 0.5,
 }
 
+# Maximum reachable stride half-length (safety cap)
+MAX_STEP = 0.14  # m — well within 0.197m horizontal reach
+
 
 def _stance_hip_angle(phase: float) -> float:
     """
@@ -55,10 +60,11 @@ def _swing_trajectory(phase: float) -> tuple[float, float]:
     Foot trajectory during swing phase.
 
     phase ∈ [0, 1) within the swing sub-phase.
-    Returns (foot_x, foot_z) in hip frame.
+    Returns (foot_x, foot_z) in hip frame — targeting ankle position.
     """
     # Horizontal: half-sine from −step/2 to +step/2
     foot_x = -STEP_LENGTH / 2 + STEP_LENGTH * phase
+    foot_x = max(-MAX_STEP, min(MAX_STEP, foot_x))
 
     # Vertical: raised by a half-sine arc
     foot_z = -(BODY_HEIGHT - STEP_HEIGHT * np.sin(np.pi * phase))
@@ -95,8 +101,10 @@ def joint_angles_at_phase(leg: str, global_phase: float) -> tuple[float, float]:
         return inverse_kinematics(foot_x, foot_z)
     except ValueError:
         # Clamp to reachable workspace edge
+        from robot.kinematics.leg_kinematics import L1, L2
+        max_reach = L1 + L2
         r = np.sqrt(foot_x**2 + foot_z**2)
-        scale = (0.90 / r)    # 90 % of max reach
+        scale = (0.90 * max_reach / r)    # 90% of max reach
         return inverse_kinematics(foot_x * scale, foot_z * scale)
 
 

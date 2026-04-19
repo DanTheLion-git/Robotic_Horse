@@ -1,23 +1,34 @@
 """
-Leg kinematics for a 2-link leg (thigh + shank) driven by a
-linear ballscrew knee actuator.
+Leg kinematics for a 3-segment quadruped leg (thigh + shank + cannon)
+driven by a linear ballscrew knee actuator.
+
+Highland Cow build — stocky low-CoM quadruped with short thick legs.
 
 Physical design (side view)
 ───────────────────────────
 
   Motor (brushless) ──▶ spins shaft
         │
-  ┌─────▼──────┐  ← top of upper-leg tube
+  ┌─────▼──────┐  ← top of upper-leg tube (thigh, L1=0.20m)
   │   shaft    │    ballscrew nut travels up/down the shaft
   │    ▲ nut   │    nut position y_nut [m] from knee pivot height
   │    │       │
   │  [slot]────┼──── pivot point (knee joint) on outside of tube
   │            │
   └────────────┘  ← bottom of upper-leg tube
+        │
+   ┌────┴────┐   ← shank (L2=0.18m)
+   │         │
+   └────┬────┘   ← ankle / cannon joint
+        │
+   ┌────┴────┐   ← cannon bone (L3=0.10m, pantograph-passive)
+   │         │
+   └────┬────┘
+       (●)       ← hoof sphere (radius 0.04m)
 
-  The nut is connected, through the slot, to the lower leg (shank)
-  at a distance R_ARM from the knee pivot.  As the nut moves up/down
-  the shaft, it swings the shank forward/backward around the pivot.
+  The cannon bone is driven passively by a pantograph linkage:
+    cannon_angle = CANNON_LEAN - (theta_thigh + theta_knee)
+  This keeps the cannon near-vertical regardless of leg pose.
 
 Virtual-work relationship (exact, no small-angle approximation)
 ───────────────────────────────────────────────────────────────
@@ -31,23 +42,28 @@ Virtual-work relationship (exact, no small-angle approximation)
 
 Coordinate convention (URDF)
 ─────────────────────────────
-  θ_knee = 0   : shank aligned with thigh (straight leg)
-  θ_knee < 0   : knee bent (shank swings backward / downward)
+  θ_knee < 0   : front leg knee bent (elbow-DOWN / carpal forward)
+  θ_knee > 0   : rear leg knee bent  (elbow-UP / hock backward)
   θ_hip  > 0   : hip swings leg forward
 """
 
+import math
 import numpy as np
 
 
-# ── Leg geometry ───────────────────────────────────────────────────
-L1 = 0.45       # upper leg (thigh) length — top of tube to knee pivot  [m]
-L2 = 0.50       # lower leg (shank) length — knee pivot to foot         [m]
+# ── Leg geometry (Highland Cow) ────────────────────────────────────
+L1 = 0.20       # thigh length  [m]
+L2 = 0.18       # shank length  [m]
+L3 = 0.10       # cannon bone length  [m]
+FOOT_R = 0.04   # hoof sphere radius  [m]
+CANNON_LEAN = 0.08  # cannon forward lean angle [rad]
 
-# ── Ballscrew joint geometry ───────────────────────────────────────
-R_ARM = 0.08            # distance from knee pivot to nut-connection point
+# ── Ballscrew joint geometry ──────────────────────────────────────
+R_ARM = 0.04            # distance from knee pivot to nut-connection point
                         # on the shank (lever arm at 90° bend)          [m]
-TUBE_RADIUS = 0.03      # outer radius of the upper-leg tube             [m]
-PIVOT_FROM_BOTTOM = 0.05  # how far above the bottom of the upper-leg tube
+                        # scaled for shorter highland cow thigh
+TUBE_RADIUS = 0.018     # outer radius of the ballscrew tube             [m]
+PIVOT_FROM_BOTTOM = 0.03  # how far above the bottom of the thigh tube
                           # the knee pivot sits                          [m]
 
 # Useful derived quantities
@@ -57,22 +73,36 @@ NUT_STROKE = R_ARM * (
     np.cos(np.radians(NUT_RANGE_MIN_DEG)) - np.cos(np.radians(NUT_RANGE_MAX_DEG))
 )  # total nut travel over working range [m]
 
+# ── Stance geometry ────────────────────────────────────────────────
+# Deep crouch neutral: thigh=0.55 rad, knee=-1.10 rad
+# FK hip height: L1*cos(0.55)+L2*cos(-0.55)+L3*cos(0.08)+FOOT_R = 0.464m
+# Ankle height (IK target): 0.464 - L3*cos(CANNON_LEAN) - FOOT_R = 0.324m
+BODY_HEIGHT = 0.464       # nominal hip-to-ground distance  [m]
+ANKLE_HEIGHT = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # ~0.324m
 
-def forward_kinematics(theta_hip: float, theta_knee: float) -> dict:
+
+def forward_kinematics(theta_hip: float, theta_knee: float,
+                        include_cannon: bool = True) -> dict:
     """
-    Compute foot position in the hip frame given joint angles.
+    Compute joint positions in the hip frame given joint angles.
+
+    Uses the 2-link (thigh+shank) IK target at the ankle, then optionally
+    appends the passively-driven cannon bone to get the hoof position.
 
     Parameters
     ----------
-    theta_hip  : float  Hip flexion/extension angle [rad].  Positive = forward.
-    theta_knee : float  Knee flexion angle [rad].  Negative = bent (URDF convention).
+    theta_hip      : float  Hip flexion/extension angle [rad].  Positive = forward.
+    theta_knee     : float  Knee flexion angle [rad].  Negative = bent front, positive = bent rear.
+    include_cannon : bool   If True, compute cannon + hoof positions too.
 
     Returns
     -------
     dict with keys:
-      'knee_pos'  : (x, z) knee position  [m]
-      'foot_pos'  : (x, z) foot position  [m]
-      'leg_length': straight-line hip-to-foot distance  [m]
+      'knee_pos'    : (x, z) knee position  [m]
+      'ankle_pos'   : (x, z) ankle / cannon-joint position  [m]
+      'foot_pos'    : (x, z) hoof contact point  [m]  (same as ankle if no cannon)
+      'leg_length'  : straight-line hip-to-ankle distance  [m]
+      'cannon_angle': cannon bone absolute angle [rad]  (if include_cannon)
     """
     # Thigh end (= knee position) in hip frame
     knee_x = L1 * np.sin(theta_hip)
@@ -80,26 +110,42 @@ def forward_kinematics(theta_hip: float, theta_knee: float) -> dict:
 
     # Absolute shank angle
     shank_angle = theta_hip + theta_knee
-    foot_x = knee_x + L2 * np.sin(shank_angle)
-    foot_z = knee_z - L2 * np.cos(shank_angle)
+    ankle_x = knee_x + L2 * np.sin(shank_angle)
+    ankle_z = knee_z - L2 * np.cos(shank_angle)
 
-    leg_length = np.sqrt(foot_x**2 + foot_z**2)
+    leg_length = np.sqrt(ankle_x**2 + ankle_z**2)
 
-    return {
+    result = {
         "knee_pos": (knee_x, knee_z),
-        "foot_pos": (foot_x, foot_z),
+        "ankle_pos": (ankle_x, ankle_z),
         "leg_length": leg_length,
     }
 
+    if include_cannon:
+        cannon_angle = CANNON_LEAN - (theta_hip + theta_knee)
+        foot_x = ankle_x + L3 * np.sin(cannon_angle)
+        foot_z = ankle_z - L3 * np.cos(cannon_angle)
+        result["foot_pos"] = (foot_x, foot_z)
+        result["cannon_angle"] = cannon_angle
+    else:
+        result["foot_pos"] = (ankle_x, ankle_z)
 
-def inverse_kinematics(foot_x: float, foot_z: float) -> tuple[float, float]:
+    return result
+
+
+def inverse_kinematics(foot_x: float, foot_z: float,
+                        elbow_up: bool = False) -> tuple[float, float]:
     """
-    Compute joint angles from a desired foot position in the hip frame.
+    Compute thigh and knee angles from a desired ankle position in the hip frame.
+
+    The IK solves for the 2-link (thigh+shank) chain targeting the ankle.
+    The cannon bone angle is then computed separately via the pantograph rule.
 
     Parameters
     ----------
-    foot_x : float  Horizontal foot position (forward positive)  [m]
-    foot_z : float  Vertical foot position (downward negative)   [m]
+    foot_x   : float  Horizontal ankle position (forward positive)  [m]
+    foot_z   : float  Vertical ankle position (downward negative)    [m]
+    elbow_up : bool   If True, rear-leg solution (positive knee). Default = front leg.
 
     Returns
     -------
@@ -122,14 +168,26 @@ def inverse_kinematics(foot_x: float, foot_z: float) -> tuple[float, float]:
     # Knee angle via law of cosines
     cos_knee = (r**2 - L1**2 - L2**2) / (2 * L1 * L2)
     cos_knee = np.clip(cos_knee, -1.0, 1.0)
-    theta_knee = -np.arccos(cos_knee)   # negative = bent knee
+
+    if elbow_up:
+        theta_knee = np.arccos(cos_knee)    # positive = rear leg hock
+    else:
+        theta_knee = -np.arccos(cos_knee)   # negative = front leg carpal
 
     # Hip angle
-    alpha = np.arctan2(foot_x, -foot_z)          # angle to target from vertical
-    beta  = np.arcsin(np.clip(L2 * np.sin(-theta_knee) / r, -1.0, 1.0))
-    theta_hip = alpha - beta
+    alpha = np.arctan2(foot_x, -foot_z)
+    beta = np.arcsin(np.clip(L2 * np.sin(abs(theta_knee)) / r, -1.0, 1.0))
+    if elbow_up:
+        theta_hip = alpha - beta
+    else:
+        theta_hip = alpha + beta
 
     return theta_hip, theta_knee
+
+
+def cannon_angle(theta_hip: float, theta_knee: float) -> float:
+    """Pantograph-driven cannon bone angle: keeps cannon near-vertical."""
+    return CANNON_LEAN - (theta_hip + theta_knee)
 
 
 def nut_position(theta_knee: float) -> float:

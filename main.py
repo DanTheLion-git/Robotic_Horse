@@ -17,7 +17,7 @@ from robot.kinematics.force_calculator import (
     analyse_gait_forces, M_BODY, NUT_STROKE,
     BALLSCREW_LEAD, BALLSCREW_EFF, CARRIAGE_DRAG_N,
 )
-from robot.kinematics.leg_kinematics import R_ARM, L1, L2
+from robot.kinematics.leg_kinematics import R_ARM, L1, L2, L3, BODY_HEIGHT, ANKLE_HEIGHT
 
 
 def plot_force_analysis(gait: dict) -> None:
@@ -55,9 +55,10 @@ def plot_force_analysis(gait: dict) -> None:
 
 def print_analysis_summary(gait: dict) -> None:
     print("\n" + "=" * 68)
-    print("  ROBOTIC HORSE — BALLSCREW FORCE ANALYSIS")
+    print("  ROBOTIC HORSE — BALLSCREW FORCE ANALYSIS (Highland Cow)")
     print(f"  Body mass : {M_BODY} kg      Gravity: 9.81 m/s²")
-    print(f"  Leg dims  : L1={L1} m (thigh)  L2={L2} m (shank)")
+    print(f"  Leg dims  : L1={L1} m (thigh)  L2={L2} m (shank)  L3={L3} m (cannon)")
+    print(f"  Hip height: {BODY_HEIGHT:.3f} m   Ankle height: {ANKLE_HEIGHT:.3f} m")
     print(f"  Lever arm : R_ARM={R_ARM*1000:.0f} mm  (pivot → nut connection)")
     print(f"  Screw lead: {BALLSCREW_LEAD*1000:.1f} mm/rev   Efficiency: {BALLSCREW_EFF*100:.0f}%")
     print(f"  Nut stroke: {NUT_STROKE*1000:.1f} mm  (over working knee-angle range)")

@@ -36,17 +36,23 @@ URDF_PATH = os.path.join(
     os.path.dirname(__file__), "..", "robot", "urdf", "robotic_horse.urdf"
 )
 
-# Joint names in the URDF that we actively control
+# Joint names in the URDF that we actively control (Highland Cow 3-segment legs)
 JOINT_MAP = {
-    "fl": {"hip": "fl_thigh_joint", "knee": "fl_knee_joint"},
-    "fr": {"hip": "fr_thigh_joint", "knee": "fr_knee_joint"},
-    "rl": {"hip": "rl_thigh_joint", "knee": "rl_knee_joint"},
-    "rr": {"hip": "rr_thigh_joint", "knee": "rr_knee_joint"},
+    "fl": {"hip": "fl_hip_joint", "thigh": "fl_thigh_joint", "knee": "fl_knee_joint", "cannon": "fl_cannon_joint"},
+    "fr": {"hip": "fr_hip_joint", "thigh": "fr_thigh_joint", "knee": "fr_knee_joint", "cannon": "fr_cannon_joint"},
+    "rl": {"hip": "rl_hip_joint", "thigh": "rl_thigh_joint", "knee": "rl_knee_joint", "cannon": "rl_cannon_joint"},
+    "rr": {"hip": "rr_hip_joint", "thigh": "rr_thigh_joint", "knee": "rr_knee_joint", "cannon": "rr_cannon_joint"},
 }
+
+FRONT_LEGS = ("fl", "fr")
+REAR_LEGS  = ("rl", "rr")
 
 SIM_DT      = 1 / 240.0    # PyBullet default timestep
 GAIT_PERIOD = 1.0           # seconds per gait cycle
 N_CYCLES    = 3             # how many gait cycles to simulate
+
+# Highland Cow cannon bone pantograph
+CANNON_LEAN = 0.08
 
 
 def build_joint_index(robot_id: int) -> dict[str, int]:
@@ -82,7 +88,7 @@ def run_simulation(gui: bool = True, record_forces: bool = True) -> dict:
     plane_id = pb.loadURDF("plane.urdf")
 
     # Load robot — spawn above ground so feet clear the floor
-    start_pos = [0, 0, 1.10]
+    start_pos = [0, 0, 0.72]   # Highland Cow hip height ~0.464m + clearance
     start_orn = pb.getQuaternionFromEuler([0, 0, 0])
     robot_id  = pb.loadURDF(
         os.path.normpath(URDF_PATH),
@@ -109,13 +115,29 @@ def run_simulation(gui: bool = True, record_forces: bool = True) -> dict:
             th_hip  = gait[leg]["theta_hip"][traj_idx]
             th_knee = gait[leg]["theta_knee"][traj_idx]
 
-            hip_jnt  = JOINT_MAP[leg]["hip"]
-            knee_jnt = JOINT_MAP[leg]["knee"]
+            # Cannon bone angle via pantograph linkage
+            th_cannon = CANNON_LEAN - (th_hip + th_knee)
 
+            hip_jnt    = JOINT_MAP[leg]["hip"]
+            thigh_jnt  = JOINT_MAP[leg]["thigh"]
+            knee_jnt   = JOINT_MAP[leg]["knee"]
+            cannon_jnt = JOINT_MAP[leg]["cannon"]
+
+            # Hip yaw stays at 0 (no turning in basic trot)
             if hip_jnt in joint_index:
                 pb.setJointMotorControl2(
                     robot_id,
                     joint_index[hip_jnt],
+                    pb.POSITION_CONTROL,
+                    targetPosition=0.0,
+                    force=200,
+                    positionGain=0.5,
+                    velocityGain=0.1,
+                )
+            if thigh_jnt in joint_index:
+                pb.setJointMotorControl2(
+                    robot_id,
+                    joint_index[thigh_jnt],
                     pb.POSITION_CONTROL,
                     targetPosition=th_hip,
                     force=500,
@@ -129,6 +151,16 @@ def run_simulation(gui: bool = True, record_forces: bool = True) -> dict:
                     pb.POSITION_CONTROL,
                     targetPosition=th_knee,
                     force=800,
+                    positionGain=0.5,
+                    velocityGain=0.1,
+                )
+            if cannon_jnt in joint_index:
+                pb.setJointMotorControl2(
+                    robot_id,
+                    joint_index[cannon_jnt],
+                    pb.POSITION_CONTROL,
+                    targetPosition=th_cannon,
+                    force=100,
                     positionGain=0.5,
                     velocityGain=0.1,
                 )
