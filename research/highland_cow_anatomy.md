@@ -111,17 +111,26 @@ Two tendons mechanically couple the stifle and hock:
 **Total: 4 DOF per leg × 4 legs = 16 actuated joints**
 (Matches our current URDF! But the joint functions should be reassigned)
 
-### Realistic segment lengths (scaled to ~100cm shoulder height):
+### Realistic segment lengths (scaled to ~150cm shoulder height):
 
-| Segment | Real Cow | Robot Scale | Current URDF |
-|---------|----------|-------------|--------------|
-| Scapula/Pelvis to shoulder/hip | hidden in body | part of body | — |
-| Humerus/Femur (upper leg) | ~25 cm | 20 cm | L1 = 0.20 ✓ |
-| Radius/Tibia (lower leg) | ~25 cm | 18 cm | L2 = 0.18 ✓ |
-| Cannon bone (metacarpal/metatarsal) | ~15 cm | 10 cm | L3 = 0.10 ✓ |
-| Hoof radius | ~5 cm | 4 cm | FOOT_R = 0.04 ✓ |
+Front and rear legs differ significantly in a bovine, just like in real cattle:
 
-**Our current proportions are actually very close to real highland cow!**
+| Segment | Real Cow (~110cm) | Robot Front (150cm scale) | Robot Rear (150cm scale) |
+|---------|-------------------|---------------------------|--------------------------|
+| Scapula/Pelvis to shoulder/hip | hidden in body | part of body | part of body |
+| Humerus/Femur (upper leg) | ~28 cm / ~37 cm | L1 = 0.38 m | L1 = 0.50 m |
+| Radius/Tibia (lower leg) | ~25 cm / ~33 cm | L2 = 0.34 m | L2 = 0.45 m |
+| Cannon bone (meta.) | ~13 cm / ~16 cm | L3 = 0.18 m | L3 = 0.22 m |
+| Hoof radius | ~4 cm / ~5 cm | FOOT_R = 0.05 m | FOOT_R = 0.06 m |
+| Ankle height (hip→ankle) | — | 0.70 m | 0.92 m |
+
+**Hip positions (relative to body center at 1.12m):**
+- Front hip: x=+0.65, y=±0.44, z=-0.15 → abs height 0.97m (scapula sits LOW on ribcage)
+- Rear hip: x=-0.65, y=±0.40, z=+0.12 → abs height 1.24m (pelvis HIGH near spine)
+
+**Body dimensions (1.36× scaled):** 1.80 × 0.88 × 0.75m (barrel)
+
+**Our proportions accurately model the asymmetry between bovine front/rear legs!**
 
 ---
 

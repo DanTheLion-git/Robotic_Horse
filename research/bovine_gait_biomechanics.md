@@ -8,13 +8,13 @@
 - Phase offsets: LH=0%, LF=25%, RH=50%, RF=75%
 
 ### Timing Parameters
-| Parameter | Dairy Cattle | Our Robot Target |
+| Parameter | Dairy Cattle | Our Robot (150cm scale) |
 |-----------|-------------|------------------|
 | Stride frequency | 0.8–1.2 Hz | ~0.9 Hz (T=1.1s) |
-| Stride length | 1.0–1.5 m | ~0.10–0.14 m (scaled) |
+| Stride length | 1.0–1.5 m | 0.65 m (walk) |
 | Duty factor | 0.60–0.75 | 0.70 |
 | Swing fraction | 0.25–0.40 | 0.30 |
-| Walking speed | 1.0–1.5 m/s | 0.25–0.35 m/s (scaled) |
+| Walking speed | 1.0–1.5 m/s | 0.80 m/s |
 
 ### Support Patterns
 - Triple support (3 legs on ground): majority of cycle
@@ -41,13 +41,13 @@
 - Phase offsets: FL=0%, RR=0%, FR=50%, RL=50%
 
 ### Timing Parameters
-| Parameter | Cattle | Our Robot Target |
+| Parameter | Cattle | Our Robot (150cm scale) |
 |-----------|--------|------------------|
 | Stride frequency | 1.5–2.5 Hz | ~1.4 Hz (T=0.7s) |
-| Stride length | 1.5–2.0 m | ~0.12–0.18 m (scaled) |
+| Stride length | 1.5–2.0 m | 0.85 m (trot) |
 | Duty factor | 0.40–0.55 | 0.50 |
 | Swing fraction | 0.45–0.60 | 0.50 |
-| Trotting speed | 2.0–4.0 m/s | 0.50–0.70 m/s (scaled) |
+| Trotting speed | 2.0–4.0 m/s | 1.50 m/s |
 
 ### Aerial Phase
 - Brief suspension phase possible at higher trot speeds

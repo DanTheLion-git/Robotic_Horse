@@ -7,7 +7,15 @@
 
 ## 1. Design Overview
 
-A bovine quadruped robot modeled after a Highland Cow, attached to a real horse-drawn carriage. The robot walks using QDD (Quasi-Direct Drive) motors with anatomically accurate bovine leg mechanics including a reciprocal apparatus for the rear legs. The carriage carries batteries, computing, and payload — reducing the need for the robot body to support all that weight.
+A bovine quadruped robot modeled after a Highland Cow, attached to a real horse-drawn carriage via a 3 DOF ball-joint hitch (yaw + roll at the cow, pitch at the carriage end). The robot walks using QDD (Quasi-Direct Drive) motors with anatomically accurate bovine leg mechanics including a reciprocal apparatus for the rear legs. The carriage carries batteries, computing, and payload — reducing the need for the robot body to support all that weight.
+
+**Steering:** Toggle A/D (discrete left/right, not ramp), turn rate 0.6 rad/s.
+
+**Gait stride lengths:**
+| Gait | Stride | Max single step |
+|---|---|---|
+| Walk | 0.65 m | 0.45 m |
+| Trot | 0.85 m | 0.45 m |
 
 **Carriage dimensions (real measurements):**
 | Parameter | Value |
@@ -16,22 +24,27 @@ A bovine quadruped robot modeled after a Highland Cow, attached to a real horse-
 | Wheelbase (front-to-back) | 205 cm |
 | Front wheel diameter | 85 cm |
 | Rear wheel diameter | 105 cm |
-| Shaft length | 235 cm (U-shaped fork, 85→70 cm wide) |
+| Shaft length | 235 cm (U-shaped fork, bars at ±50cm = 1.0m apart at cow end, cross piece 85cm) |
 | Hitch position | 50 cm fwd + 37 cm above front wheel center |
+| Hitch type | 3 DOF ball joint: yaw(Z) + roll(X) at cow, pitch(Y) at carriage end |
 | Body (L×W×H) | 250 × 110 × 110 cm, ~60 cm off ground |
 | Style | Vis-à-vis (two facing bench seats) |
 
 **Key dimensions (150cm scale):**
 | Parameter | Value |
 |---|---|
-| Body (L×W×H) | 1.80 × 0.80 × 0.55 m |
+| Body (L×W×H) | 1.80 × 0.88 × 0.75 m |
 | Withers height | 1.50 m |
-| Body center height | 1.08 m |
+| Body center height | 1.12 m |
+| Body floor clearance | ~0.60 m off ground |
 | Front hip height | 0.93 m (low on body — scapula) |
 | Rear hip height | 1.20 m (high on body — pelvis) |
+| Front hip mounts | x=+0.65m, y=±0.44m, z=-0.15m from body center |
+| Rear hip mounts | x=-0.65m, y=±0.40m, z=+0.12m from body center |
 | Front leg segments | Thigh 0.38m, Shank 0.34m, Cannon 0.18m |
 | Rear leg segments | Thigh 0.50m, Shank 0.45m, Cannon 0.22m |
 | Hoof radius | Front 0.05m, Rear 0.06m |
+| Shaft bars | ±0.50m (1.0m apart), width at cow end 1.0m, cross piece 0.85m |
 | Weight distribution | 55% front / 45% rear |
 | Body mass (sim) | 107 kg |
 
@@ -243,9 +256,13 @@ Consider downgrading to RobStride 03 only after successful full-prototype testin
 - [x] QDD motor model and force analysis
 - [x] Bovine walk + trot gaits
 - [x] Gazebo URDF with articulated head
-- [x] Carriage URDF with wheel physics (205cm track, 140cm wheelbase)
+- [x] Carriage URDF with wheel physics (145cm track, 205cm wheelbase)
 - [x] Scale to 150cm withers height with anatomical body shape
 - [x] Front/rear leg differentiation (different lengths/masses)
+- [x] Ball-joint hitch (3 DOF: yaw + roll + pitch)
+- [x] Dynamic stride-length gait (walk 0.65m, trot 0.85m, max step 0.45m)
+- [x] Toggle A/D steering in teleop (turn rate 0.6 rad/s)
+- [x] Cart body at correct height (~60cm off ground)
 - [ ] Run simulation, record joint torques
 - [ ] Validate motor selection against sim data
 - **Cost: €0** (software only)
@@ -293,7 +310,7 @@ Complete the robot with all 4 legs, full body frame, head, and carriage.
 | Component | Qty/Notes | Cost |
 |---|---|---|
 | Remaining 2 leg sets | 8 motors | €3,000 |
-| Full body frame | aluminum/steel (1.80×0.80m) | €600 |
+| Full body frame | aluminum/steel (1.80×0.88m) | €600 |
 | Head/neck assembly | servos + structure | €150 |
 | Decoration (faux fur, shell) | 150cm scale | €350 |
 | Carriage hub motors (×2) | 350W each | €240 |
@@ -328,7 +345,186 @@ Complete the robot with all 4 legs, full body frame, head, and carriage.
 
 ---
 
-## 9. Open Questions / TBD
+## 9. Frame Construction Tutorial
+
+A detailed guide on building the aluminum extrusion frame and assembling all mechanical components.
+
+### 9.1 Materials Needed
+
+- **40×40mm or 40×80mm aluminum T-slot extrusion** (e.g., 8020 / Misumi / Bosch Rexroth / Dold Mechatronik)
+- **Corner brackets, T-nuts, M8 bolts** — standard T-slot fastening hardware
+- **6061 aluminum plate (3–5mm)** for motor mounting plates
+- **Steel reinforcement plates (3mm)** for hip joint mounts (high stress area)
+- **Aluminum rectangular tube** (40×20mm, 30×20mm, 25×15mm) for leg links
+- **6205 deep-groove ball bearings** (25×52×15mm) for joint rotation
+- **Drag chains** (15×20mm) for cable protection on each leg
+- **4mm stainless steel wire rope** for rear-leg reciprocal apparatus
+
+### 9.2 Body Frame Layout
+
+The frame is a rectangular extrusion skeleton. The barrel-shaped Highland Cow body is a cosmetic shell mounted over it — it does not need to be structural.
+
+1. **Main spine:** 2× 1800mm horizontal rails (40×80mm) — the backbone, running front-to-rear
+2. **Cross members:** 4× 880mm rails connecting left-right at front, mid-front, mid-rear, and rear
+3. **Vertical posts:** 4× at each hip position to support motor mounts
+4. **Front hip mounts** at x=+0.65m, y=±0.44m, z=-0.15m from body center
+5. **Rear hip mounts** at x=-0.65m, y=±0.40m, z=+0.12m from body center
+
+> **Tip:** Pre-drill and tap the extrusion ends for M8 bolts. Use steel gusset plates at the hip mount positions — these see the highest forces during walking.
+
+### 9.3 Motor Mounting
+
+| Joint | Motor | Mount Position | Shaft Orientation |
+|---|---|---|---|
+| Hip yaw | RobStride 06 | Vertically on frame cross-member | Output shaft pointing down |
+| Hip pitch | RobStride 04 | Bracket hanging from hip yaw output | Shaft horizontal (Y-axis) |
+| Knee (stifle) | RobStride 04 | End of thigh link | Shaft horizontal (Y-axis) |
+| Cannon (hock) | RobStride 02 | End of shank link | Shaft horizontal (Y-axis) |
+
+### 9.4 Leg Link Construction
+
+| Link | Section | Front Length | Rear Length | Notes |
+|---|---|---|---|---|
+| Thigh | 40×20mm rect. tube | 380mm | 500mm | Motor flanges at both ends |
+| Shank | 30×20mm rect. tube | 340mm | 450mm | Motor flanges at both ends |
+| Cannon | 25×15mm tube | 180mm | 220mm | Motor flange + hoof mount |
+
+- Each link needs **motor mounting flanges** at both ends — CNC milled from 6061 aluminum or 3D printed in nylon PA12
+- Press-fit **6205 bearings** into bearing housings at each joint for smooth, low-friction rotation
+- The rear leg total length is ~1.17m — the test stand must be at least 1.5m tall
+
+### 9.5 Reciprocal Apparatus (Rear Legs Only)
+
+The reciprocal apparatus couples stifle (knee) and hock (cannon) motion via a tension cable, mimicking real bovine anatomy:
+
+- **Cable:** 4mm stainless steel wire rope from stifle to hock
+- **Routing:** Outside of the leg, through PTFE-lined cable guides
+- **Spring tensioner** to maintain cable tension across the range of motion
+- **Coupling ratio:** `hock_angle = 0.3792 - 0.85 × knee_angle`
+
+### 9.6 Hoof / Foot Design
+
+- **Rubber hemisphere** (Shore 60A durometer) bonded to an aluminum disc
+- Front hooves: 50mm radius, Rear hooves: 60mm radius
+- **Force-sensitive resistor (FSR)** — Interlink 406 — placed under the rubber pad for ground contact detection
+- **Mounting:** M8 threaded stud screws into the cannon link end cap
+
+### 9.7 Head / Neck Construction
+
+| Part | Actuator | Notes |
+|---|---|---|
+| Neck yaw | DS3235 servo | Pan-tilt bracket, lower axis |
+| Neck pitch | DS3235 servo | Pan-tilt bracket, upper axis |
+| Head nod | DS3225 servo | Tilts head relative to neck |
+| Jaw | SG90 micro servo | Simple hinge for mouth open/close |
+| Eyes (×2) | SG90 micro servos | 3D-printed eye mechanism |
+| Eyelids (×2) | SG90 micro servos | Blink mechanism |
+
+- **Head shell:** Lightweight foam or fiberglass over a 3D-printed internal skeleton
+- **Attachment point:** Front of body frame at x=+0.90m, z=+0.42m above body center
+- **Total head/neck mass:** ~6.5 kg (already included in 55/45 weight distribution)
+
+### 9.8 Shaft Connection (Harness / Hitch)
+
+The shaft connects the cow to the carriage via a 3 DOF ball joint:
+
+1. **Ball-joint adapter:** Universal joint (U-joint) rated for 500+ kg
+2. **Mount position:** Below body center at z=-0.30m from body center
+3. **Degrees of freedom:** Yaw (Z) + Roll (X) at the cow end; Pitch (Y) at the carriage end
+4. **Alternative:** Two stacked pillow-block bearings oriented 90° apart
+5. **Shaft bars** run alongside the body at ±0.50m (1.0m total spacing), clearing the 0.88m body width
+6. **Shaft width** at cow end: 1.0m; cross piece: 0.85m
+
+### 9.9 Wiring Routing
+
+1. **Main 48V bus:** From carriage battery → through shaft cable tray → body frame cable tray → motor drivers
+2. **CAN bus:** Shielded twisted pair, daisy-chained through all 4 leg motor sets (IDs 1–4 front-left, 5–8 front-right, 9–12 rear-left, 13–16 rear-right)
+3. **Servo signals:** Ribbon cable from PCA9685 (I²C) to all 7 head servos
+4. **Drag chains:** One per leg (15×20mm), protecting motor power + CAN cables during walking motion
+5. **Weatherproof connectors:** IP67 circular connectors at the shaft/body junction (power, CAN, servo signals)
+
+---
+
+## 10. Suggested Parts List with Sources
+
+A shopping list organized by build phase with suggested suppliers.
+
+### Phase 1 — Single Leg
+
+| Part | Spec | Qty | Source | Est. Price |
+|---|---|---|---|---|
+| RobStride 06 | Hip yaw QDD | 1 | LimX Dynamics / AliExpress | €300 |
+| RobStride 04 | Hip/knee QDD | 2 | LimX Dynamics / AliExpress | €1,000 |
+| RobStride 02 | Cannon QDD | 1 | LimX Dynamics / AliExpress | €200 |
+| 40×80 T-slot extrusion | 1800mm | 2 | Misumi / Dold Mechatronik | €40 |
+| 40×40 T-slot extrusion | 880mm | 4 | Misumi / Dold Mechatronik | €25 |
+| Corner brackets + hardware | M8 set | 1 | Amazon / RS Components | €30 |
+| 6061 aluminum plate | 300×200×5mm | 4 | Metaal24 / Aluminium Online | €40 |
+| Aluminum rectangular tube | 40×20×2mm, 2m | 2 | Local metal supplier | €15 |
+| 6205 bearings | 25×52×15mm | 4 | SKF / Amazon | €20 |
+| CAN-bus USB adapter | PEAK PCAN-USB | 1 | PEAK / Mouser | €30 |
+| Jetson Orin Nano (8GB) | Dev kit | 1 | NVIDIA / RS Components | €250 |
+| 48V bench power supply | 48V 10A | 1 | Amazon / AliExpress | €80 |
+| 3D printed brackets | Nylon PA12 | 1 set | JLC3DP / own printer | €75 |
+| Test stand frame | T-slot, 1.5m tall | 1 | — | €120 |
+| Rubber foot pad | Shore 60A, 50mm | 1 | Amazon | €10 |
+| Misc (wiring, connectors, M8 bolts) | — | — | — | €50 |
+
+### Phase 2 — Add Second Leg + Body Frame
+
+| Part | Spec | Qty | Source | Est. Price |
+|---|---|---|---|---|
+| Additional leg motor set | 06+04+04+02 | 1 | LimX Dynamics | €1,500 |
+| Body frame extrusion | 40×80, various lengths | 6m total | Misumi | €120 |
+| Cross members + brackets | — | set | — | €80 |
+| Motor mounting plates | CNC 6061 aluminum | 4 | JLC CNC / local | €100 |
+| BNO085 IMU | 9-DOF | 1 | Adafruit / Mouser | €25 |
+| FSR foot sensors | Interlink 406 | 2 | Mouser / Digi-Key | €10 |
+| 48V 10Ah LiFePO4 | — | 1 | AliExpress / Fogstar | €200 |
+| CAN bus cable | Shielded twisted pair, 5m | 1 | RS Components | €15 |
+| Drag chains | 15×20mm, 1m | 2 | Amazon / AliExpress | €15 |
+| Cable + connectors | — | — | — | €50 |
+
+### Phase 3 — Full Quadruped + Head + Carriage
+
+| Part | Spec | Qty | Source | Est. Price |
+|---|---|---|---|---|
+| Remaining 2 leg motor sets | — | 2 | — | €3,000 |
+| Full body frame completion | — | — | — | €350 |
+| Head/neck servos | DS3235×2, DS3225×1, SG90×5 | 1 set | Amazon | €83 |
+| Head structure | Foam + fiberglass + 3D print | 1 | — | €70 |
+| Faux fur / decoration | — | — | — | €350 |
+| Hub motors (carriage) | 36V 350W | 2 | AliExpress / eBay | €240 |
+| Hub motor ESCs | 36V 25A | 2 | AliExpress | €80 |
+| 48V 20Ah LiFePO4 (upgrade) | — | 1 | Fogstar / AliExpress | €350 |
+| BMS + charger | 48V 5A | 1 | — | €80 |
+| USB camera | Arducam / Logitech | 1 | Amazon | €30 |
+| PCA9685 servo controller | I²C | 1 | Adafruit | €10 |
+| U-joint (hitch) | HD, rated 500kg+ | 1 | Industrial supplier | €50 |
+| Weatherproof connectors | IP67 circular | 4 | RS / Mouser | €40 |
+
+---
+
+## 11. Assembly Order (Step-by-Step)
+
+1. **Build test stand** from T-slot extrusion (1.5m tall, needs to support a leg hanging freely)
+2. **Assemble one leg:** Mount motors into 3D-printed/CNC brackets, connect links, test full range of motion by hand
+3. **Wire CAN bus:** Jetson Orin → PCAN-USB adapter → daisy chain through 4 motors (CAN IDs 1–4)
+4. **Flash motor firmware,** verify encoder feedback, set CAN IDs
+5. **Run single-leg calibration script** — find joint limits, verify direction conventions match URDF
+6. **Standing test** — hold leg at neutral stance, measure current draw vs. simulation prediction
+7. **Walking test** — single-leg walking motion on test stand, verify reciprocal apparatus cable coupling
+8. **Measure actual torques** and compare to simulation predictions — validate motor selection
+9. **Build half-body frame** (one front + one rear leg mount, partial spine)
+10. **Mount IMU** (BNO085) on body frame, wire second leg (CAN IDs 5–8)
+11. **Rail-guided 2-leg walking test** — front+rear leg on a linear guide rail
+12. **Validate front-rear weight transfer** — check 55/45 distribution matches sim
+13. **Expand to full 4-leg body,** mount head, connect carriage via U-joint hitch
+14. **Full system integration** — outdoor testing on flat surface, then gravel/grass
+
+---
+
+## 12. Open Questions / TBD
 
 - [ ] Exact carriage weight (user to measure)
 - [ ] Carriage hitch height and angle tolerance

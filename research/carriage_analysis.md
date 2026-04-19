@@ -7,16 +7,20 @@ Based on reference photos in `../reference/`:
 - **Seating**: Vis-à-vis (facing each other), 4-6 passengers
 - **Draft**: Two shafts extending forward for single draft animal
 
-## 2. DIMENSIONS (estimated from photos)
+## 2. DIMENSIONS (measured from owner's carriage)
 | Component | Dimension |
 |-----------|-----------|
-| Overall length | ~3.0-3.5 m |
-| Overall width | ~1.4-1.6 m |
-| Body height | ~0.7-0.9 m (floor to top) |
-| Front wheel diameter | ~0.7 m |
-| Rear wheel diameter | ~1.0 m |
-| Shaft length | ~2.0-2.5 m from front axle |
-| Shaft spacing | ~0.5-0.6 m (fits draft animal body) |
+| Front wheel diameter | 85 cm |
+| Rear wheel diameter | 105 cm |
+| Wheelbase (front-to-back, center-to-center) | 205 cm |
+| Track (side-to-side, center-to-center) | 145 cm |
+| Shaft length | 235 cm (U-shaped fork) |
+| Shaft spacing (at cow body) | 100 cm (bars at ±0.50m, clears 88cm body) |
+| Shaft cross piece (carriage end) | 85 cm |
+| Hitch position | 50 cm fwd + 37 cm above front wheel center |
+| Body (L × W × H) | 250 × 110 × 110 cm |
+| Body floor height | ~60 cm off ground |
+| Style | Vis-à-vis (two facing bench seats) |
 
 ## 3. WEIGHT ESTIMATES
 | Configuration | Weight (kg) |
@@ -59,10 +63,14 @@ Common grades:
 | Starting (0.5 m/s²) | +250 | +25.5 |
 
 ## 5. SHAFT ATTACHMENT DESIGN
-- Rigid shafts connect to robot body at a UNIVERSAL JOINT (2 DOF: pitch + yaw)
+- Shafts connect to robot body via a **3 DOF ball joint** (yaw + roll at cow, pitch at carriage end)
+- Yaw (z-axis): continuous rotation, very low damping (0.2) — cow sways freely
+- Roll (x-axis): ±0.25 rad (±14°), low damping (0.3) — body roll doesn't jostle carriage
+- Pitch (y-axis): ±0.35 rad (±20°), moderate damping (1.5) — at perch/front axle connection
+- Shaft bars run alongside body at ±0.50m (1.0m apart), clearing 0.88m body width
 - Shafts provide LATERAL STABILITY — prevents robot falling sideways
 - Vertical force on shafts is minimal (carriage balanced on its own wheels)
-- Horizontal force = traction (pulling force)
+- Horizontal force = traction (pulling force, optional with motorized carriage wheels)
 - Robot does NOT carry the carriage weight — only pulls it
 
 ## 6. STABILITY ADVANTAGE

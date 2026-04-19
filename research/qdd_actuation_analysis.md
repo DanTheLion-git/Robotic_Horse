@@ -62,15 +62,25 @@ Where:
 
 ## 4. MASS BUDGET UPDATE (QDD)
 
-| Component | Mass (kg) |
-|-----------|-----------|
-| Motors (16 × QDD) | 15.5 |
-| Motor drivers/ESCs (16 × 100g) | 1.6 |
-| Frame (aluminium extrusion) | 20.0 |
-| Electronics (computer, sensors, wiring) | 3.0 |
-| Battery (48V, 20Ah LiFePO4) | 8.0 |
-| Leg links (4 × ~2kg each) | 8.0 |
-| Decoration/dressing | 30.0 |
-| **Total** | **~86 kg** |
+| Component | Mass (kg) | Notes |
+|-----------|-----------|-------|
+| **Robot body** | | |
+| QDD leg motors (×16) | 15.5 | RobStride 06×4 + 04×8 + 02×4 |
+| Body frame (aluminum extrusion) | 32.0 | 40×80mm T-slot, 150cm scale |
+| Leg structure (×4, front/rear differ) | 26.0 | Front: 5.7kg, Rear: 7.3kg per leg |
+| Head/neck assembly | 6.5 | Neck 3.0 + skull 2.0 + servos 0.5 + misc |
+| Body decoration (fur/shell) | 8.0 | Faux fur or lightweight panels |
+| Wiring & misc | 4.0 | Motor cables, connectors |
+| IMU + sensors | 0.5 | IMU, FSR in feet |
+| **Robot subtotal** | **~92.5 kg** | |
+| | | |
+| **Carriage** | | |
+| Carriage body + shaft + axles + wheels | 119.0 | See robot_build_plan.md §3 |
+| **Driver** | 85.0 | Seated on front bench |
+| | | |
+| **Electronics (on carriage)** | | |
+| Compute + drivers + battery | 21.0 | Jetson + CAN + 48V 20Ah LiFePO4 |
+| | | |
+| **GRAND TOTAL** | **~317.5 kg** | Robot + carriage + driver + electronics |
 
-Note: lighter than previous 100kg estimate since QDD motors are lighter than ballscrew assemblies.
+Note: Robot body alone is ~92.5 kg (within QDD motor capacity). Carriage weight is carried by its own wheels, not the robot legs.
