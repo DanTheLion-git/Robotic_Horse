@@ -54,8 +54,8 @@ WALK = {
     'period': 1.1,             # seconds per full stride cycle
     'step_height_front': 0.10, # front legs lift higher (weight-bearing clearance)
     'step_height_rear': 0.08,  # rear legs slightly lower arc
-    'stride_length': 0.50,     # full stride at steady-state speed [m]
-    'min_stride': 0.12,        # full stride at startup / acceleration [m]
+    'stride_length': 0.65,     # full stride at steady-state speed [m]
+    'min_stride': 0.15,        # full stride at startup / acceleration [m]
     'speed': 0.80,             # target walking speed [m/s] (real cow ~0.8-1.0)
 }
 
@@ -68,15 +68,15 @@ TROT = {
     'period': 0.70,            # faster cadence for trot
     'step_height_front': 0.14, # higher clearance needed at trot speed
     'step_height_rear': 0.12,
-    'stride_length': 0.65,     # full stride at steady trot [m]
-    'min_stride': 0.18,        # full stride during trot startup [m]
+    'stride_length': 0.85,     # full stride at steady trot [m]
+    'min_stride': 0.22,        # full stride during trot startup [m]
     'speed': 1.50,             # target trotting speed [m/s] (real cow ~1.5-2.5)
 }
 
 GAIT_SEQUENCE = [WALK, TROT]
 
 # ── Gait parameters ───────────────────────────────────────────────
-MAX_STEP       = 0.35    # hard cap on stride half-length [m]
+MAX_STEP       = 0.45    # hard cap on stride half-length [m]
 
 # ── Overtracking ──────────────────────────────────────────────────
 # Rear hooves land slightly ahead of where the ipsilateral front hoof was

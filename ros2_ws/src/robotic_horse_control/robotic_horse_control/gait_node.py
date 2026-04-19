@@ -45,11 +45,11 @@ ANKLE_HEIGHT_FRONT = 0.70   # front ankle-to-hip height [m]
 ANKLE_HEIGHT_REAR  = 0.92   # rear ankle-to-hip height [m]
 
 # Bovine walk gait parameters
-STEP_LENGTH       = 0.50   # full stride at steady walk [m]
+STEP_LENGTH       = 0.65   # full stride at steady walk [m]
 STEP_HEIGHT_FRONT = 0.08
 STEP_HEIGHT_REAR  = 0.07
 SWING_FRAC        = 0.30   # 30% swing / 70% stance (bovine walk duty factor)
-MAX_STEP          = 0.35   # hard cap on stride half-length [m]
+MAX_STEP          = 0.45   # hard cap on stride half-length [m]
 
 # 4-beat lateral sequence: RL → FL → RR → FR
 PHASE_OFFSET = {'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75}

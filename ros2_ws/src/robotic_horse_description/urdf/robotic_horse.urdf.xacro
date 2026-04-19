@@ -602,56 +602,77 @@
        CARRIAGE — vis-à-vis style, hitched to bovine robot
        Correct kinematic chain (real carriage):
          base_link → shaft_yaw (continuous, z)
-           → shaft_link (U-fork, 2.35m)
-             → shaft_pitch (revolute, y, at perch)
-               → front_assembly_link (perch + front axle + turntable)
-                 ├─ cart_fl_wheel_joint (continuous)
-                 ├─ cart_fr_wheel_joint (continuous)
-                 └─ turntable_yaw_joint (revolute, z, ±45°)
-                    → cart_body_link (body, driver, etc.)
-                      → rear_axle_joint (fixed)
-                        → rear_axle_link
-                          ├─ cart_rl_wheel_joint (continuous)
-                          └─ cart_rr_wheel_joint (continuous)
+           → shaft_yaw_link (dummy)
+             → shaft_roll (revolute, x, ±0.20 rad)
+               → shaft_link (U-fork, 2.35m, bars at ±0.50m to clear body)
+                 → shaft_pitch (revolute, y, at perch)
+                   → front_assembly_link (perch + front axle + turntable)
+                     ├─ cart_fl_wheel_joint (continuous)
+                     ├─ cart_fr_wheel_joint (continuous)
+                     └─ turntable_yaw_joint (revolute, z, ±45°)
+                        → cart_body_link (body, driver, etc.)
+                          → rear_axle_joint (fixed)
+                            → rear_axle_link
+                              ├─ cart_rl_wheel_joint (continuous)
+                              └─ cart_rr_wheel_joint (continuous)
+       Ball-joint at cow: yaw (z) + roll (x) = 2 DOF
+       Pitch at carriage end: 1 DOF
+       Total: 3 rotational DOF ≈ ball joint
+       Shaft bars at ±0.50m (1.0m apart) clear 0.88m body width
        Real measurements from owner's carriage:
          Front wheels ⌀ 85 cm,  Rear wheels ⌀ 105 cm
          Wheelbase 205 cm,  Track 145 cm
-         Shaft 235 cm long, U-shaped, 85→70 cm wide
+         Shaft 235 cm long, U-shaped
          Perch: shaft connects to front axle assembly 50cm fwd of wheel center
          Body: 250 × 110 × 110 cm, ~60 cm off ground
          Driver: ~85 kg on front bench
        Total carriage mass ≈ 105 kg + 85 kg driver = 190 kg
   ═══════════════════════════════════════════════════════ -->
 
-  <!-- Shaft yaw joint (base_link → shaft) — continuous rotation (infinite turn angle)
-       Very low damping: cow can sway laterally without jostling the carriage.
-       In reality, the shaft hangs via leather harness straps with lots of compliance. -->
+  <!-- Shaft yaw joint — free yaw rotation (harness strap compliance)
+       Very low damping: cow can sway without jostling carriage -->
   <joint name="shaft_yaw_joint" type="continuous">
-    <parent link="base_link"/><child link="shaft_link"/>
+    <parent link="base_link"/><child link="shaft_yaw_link"/>
     <origin xyz="0.0 0 -0.30" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <dynamics damping="0.2" friction="0.05"/>
   </joint>
+  <!-- Dummy link between yaw and roll joints -->
+  <link name="shaft_yaw_link">
+    <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+  </link>
 
-  <!-- Shaft — U-shaped wooden fork, 2.35m long -->
+  <!-- Shaft roll joint — allows body roll without transferring to carriage
+       Simulates leather harness flexibility around the barrel -->
+  <joint name="shaft_roll_joint" type="revolute">
+    <parent link="shaft_yaw_link"/><child link="shaft_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-0.25" upper="0.25" effort="0" velocity="2.0"/>
+    <dynamics damping="0.3" friction="0.05"/>
+  </joint>
+
+  <!-- Shaft — U-shaped wooden fork, 2.35m long
+       Bars at ±0.50m (1.0m apart) to clear 0.88m body width -->
   <link name="shaft_link">
     <inertial><mass value="15.0"/><origin xyz="-1.175 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.10" iyy="6.93" izz="6.95" ixy="0" ixz="0" iyz="0"/></inertial>
+      <inertia ixx="0.15" iyy="6.93" izz="7.00" ixy="0" ixz="0" iyz="0"/></inertial>
     <!-- Left shaft bar -->
-    <visual><origin xyz="-1.175 0.39 0" rpy="0 0 0"/>
+    <visual><origin xyz="-1.175 0.50 0" rpy="0 0 0"/>
       <geometry><box size="2.35 0.05 0.05"/></geometry><material name="wood"/></visual>
-    <collision><origin xyz="-1.175 0.39 0" rpy="0 0 0"/>
+    <collision><origin xyz="-1.175 0.50 0" rpy="0 0 0"/>
       <geometry><box size="2.35 0.05 0.05"/></geometry></collision>
     <!-- Right shaft bar -->
-    <visual><origin xyz="-1.175 -0.39 0" rpy="0 0 0"/>
+    <visual><origin xyz="-1.175 -0.50 0" rpy="0 0 0"/>
       <geometry><box size="2.35 0.05 0.05"/></geometry><material name="wood"/></visual>
-    <collision><origin xyz="-1.175 -0.39 0" rpy="0 0 0"/>
+    <collision><origin xyz="-1.175 -0.50 0" rpy="0 0 0"/>
       <geometry><box size="2.35 0.05 0.05"/></geometry></collision>
-    <!-- Cross piece at carriage end -->
+    <!-- Cross piece at carriage end (tapers to ~0.85m) -->
     <visual><origin xyz="-2.30 0 0" rpy="0 0 0"/>
-      <geometry><box size="0.05 0.70 0.05"/></geometry><material name="wood"/></visual>
+      <geometry><box size="0.05 0.85 0.05"/></geometry><material name="wood"/></visual>
     <collision><origin xyz="-2.30 0 0" rpy="0 0 0"/>
-      <geometry><box size="0.05 0.70 0.05"/></geometry></collision>
+      <geometry><box size="0.05 0.85 0.05"/></geometry></collision>
   </link>
 
   <!-- Shaft pitch joint — perch pivot at front of front axle assembly
@@ -879,6 +900,7 @@
   </link>
 
   <!-- ── Gazebo contact/material for carriage ── -->
+  <gazebo reference="shaft_yaw_link"/>
   <gazebo reference="shaft_link"><material>Gazebo/Wood</material></gazebo>
   <gazebo reference="front_assembly_link"><material>Gazebo/Grey</material></gazebo>
   <gazebo reference="cart_body_link"><material>Gazebo/Wood</material></gazebo>

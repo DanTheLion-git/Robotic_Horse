@@ -88,7 +88,7 @@ def run_simulation(gui: bool = True, record_forces: bool = True,
     plane_id = pb.loadURDF("plane.urdf")
 
     # spawn z=1.08m: body center height for 150cm Highland Cow (feet at ground level at neutral stance).
-    start_pos = [0, 0, 1.08]
+    start_pos = [0, 0, 1.12]
     start_orn = pb.getQuaternionFromEuler([0, 0, 0])
     robot_id  = pb.loadURDF(
         os.path.normpath(URDF_PATH),

@@ -57,8 +57,8 @@ BODY_WIDTH   = 0.80   # 2 × 0.40 m lateral hip offset
 N_FRAMES     = 60     # frames per animation
 DURATION     = 1.0    # seconds per full gait cycle
 SWING_FRAC   = 0.40
-MAX_STEP     = 0.35   # hard cap on stride half-length [m]
-STEP_LENGTH  = 0.50   # full stride at steady walk [m]
+MAX_STEP     = 0.45   # hard cap on stride half-length [m]
+STEP_LENGTH  = 0.65   # full stride at steady walk [m]
 
 JOINT_NAMES = [
     "fl_hip_joint", "fl_thigh_joint", "fl_knee_joint", "fl_cannon_joint",

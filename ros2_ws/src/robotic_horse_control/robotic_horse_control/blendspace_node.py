@@ -97,8 +97,8 @@ WALK = dict(
     swing_frac=0.30,
     step_height_front=0.10,  # front legs lift higher (weight-bearing)
     step_height_rear=0.08,   # rear legs lower arc (propulsive)
-    stride_length=0.50,      # full stride at steady walk [m]
-    min_stride=0.12,         # full stride at startup [m]
+    stride_length=0.65,      # full stride at steady walk [m]
+    min_stride=0.15,         # full stride at startup [m]
     period=1.1,              # ~0.9 Hz stride frequency (bovine walk)
     name='WALK',
 )
@@ -108,8 +108,8 @@ TROT = dict(
     swing_frac=0.50,
     step_height_front=0.14,  # higher clearance at trot speed
     step_height_rear=0.12,
-    stride_length=0.65,      # full stride at steady trot [m]
-    min_stride=0.18,         # full stride during trot startup [m]
+    stride_length=0.85,      # full stride at steady trot [m]
+    min_stride=0.22,         # full stride during trot startup [m]
     period=0.70,             # ~1.4 Hz stride frequency (bovine trot)
     name='TROT',
 )
@@ -126,7 +126,7 @@ TROT_THRESHOLD = 1.10   # linear.x above this = TROT
 
 # ── Control limits ────────────────────────────────────────────────────────────
 MAX_SHOULDER = 0.20   # rad  max hip Z-yaw
-MAX_STEP     = 0.35   # m    hard cap on stride half-length
+MAX_STEP     = 0.45   # m    hard cap on stride half-length
 
 # Speed ramp: strides grow from short→long over first few cycles after starting
 SPEED_RAMP_RATE    = 0.12   # ramp increment per tick (0→1 in ~8 ticks ≈ 4 cycles)
