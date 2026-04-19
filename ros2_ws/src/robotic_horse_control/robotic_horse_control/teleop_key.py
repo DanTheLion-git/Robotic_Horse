@@ -22,8 +22,8 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 
 
-WALK_SPEED    = 0.80   # m/s published for WALK state (realistic cow walk)
-TROT_SPEED    = 1.50   # m/s published for TROT state (realistic cow trot)
+WALK_SPEED    = 1.00   # m/s published for WALK state (bovine walk)
+TROT_SPEED    = 2.00   # m/s published for TROT state (bovine trot)
 TURN_RATE     = 0.6    # rad/s when turning
 PUBLISH_HZ    = 25
 

@@ -1,9 +1,9 @@
 # ros2_control.yaml
 # ──────────────────
-# PID gains for Highland Cow: 400kg body, L1=0.20m, L2=0.18m, L3=0.10m.
+# PID gains for Highland Cow: 107kg body, articulated spine, QDD motors.
 # Very heavy body needs extremely stiff thigh+knee to hold stance.
 # Horse is free-standing root; cart attached by passive rope joints.
-# 16 commanded joints: 4 legs x (hip_Z + thigh_Y + knee_Y + cannon_Y)
+# 17 commanded joints: spine(Z) + 4 legs x (hip_Z + thigh_Y + knee_Y + cannon_Y)
 
 controller_manager:
   ros__parameters:
@@ -12,6 +12,7 @@ controller_manager:
 leg_controller:
   ros__parameters:
     joints:
+      - spine_yaw_joint
       - fl_hip_joint
       - fl_thigh_joint
       - fl_knee_joint
@@ -37,6 +38,7 @@ leg_controller:
       - velocity
 
     gains:
+      spine_yaw_joint: { p: 2000.0, i: 0.0, d: 120.0 }
       fl_hip_joint:    { p: 600.0,  i: 0.0, d:  40.0 }
       fl_thigh_joint:  { p: 3000.0, i: 0.0, d: 150.0 }
       fl_knee_joint:   { p: 4500.0, i: 0.0, d: 200.0 }

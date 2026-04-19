@@ -13,7 +13,8 @@
       |        |
       RL –––– RR
 
-  Controlled joints (16 total, QDD actuated):
+  Controlled joints (17 total, QDD actuated):
+      spine_yaw_joint              — spine lateral bend       (position ctrl)
       {fl,fr,rl,rr}_hip_joint     — lateral hip yaw          (position ctrl)
       {fl,fr,rl,rr}_thigh_joint   — hip flexion/extension    (position ctrl)
       {fl,fr,rl,rr}_knee_joint    — stifle/elbow flexion     (position ctrl)
@@ -77,19 +78,68 @@
   <!-- Body mass ~107 kg: motors(48)+frame(38)+electronics(8)+decoration(8)+legs(5).
        Inertia (107 kg, 1.80x0.88x0.85 m box): Ixx=13.35, Iyy=35.33, Izz=35.80 kg·m²
        Scaled 1.36× from real Highland cow (110cm withers → 150cm) -->
+  <!-- base_link = REAR body half (haunches/lumbar).
+       Rear legs (RL/RR) and carriage hitch attach here.
+       IMU stays on base_link for balance sensing. -->
   <link name="base_link">
     <inertial>
-      <mass value="107.0"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="13.35" iyy="35.33" izz="35.80" ixy="0" ixz="0" iyz="0"/>
+      <mass value="48.0"/>
+      <origin xyz="0.45 0 0" rpy="0 0 0"/>
+      <inertia ixx="6.0" iyy="6.1" izz="6.3" ixy="0" ixz="0" iyz="0"/>
     </inertial>
-    <!-- Main barrel (ribcage/abdomen) — 1.36× scaled: 75cm tall, 88cm wide -->
+    <!-- Rear barrel half -->
     <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><box size="1.80 0.88 0.75"/></geometry>
+      <origin xyz="0.45 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.90 0.88 0.75"/></geometry>
       <material name="body_panel"/>
     </visual>
-    <!-- Withers rise (front — now at -X since robot faces -X) -->
+    <!-- Rump (back — at +X) -->
+    <visual>
+      <origin xyz="0.55 0 0.425" rpy="0 0 0"/>
+      <geometry><box size="0.40 0.76 0.10"/></geometry>
+      <material name="body_panel"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0.45 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.90 0.88 0.85"/></geometry>
+    </collision>
+  </link>
+  <gazebo reference="base_link">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+
+  <!-- ═══════════════════════════════════════════════════════
+       SPINE YAW JOINT — articulated spine for turning
+       Connects rear body (base_link) to front body (front_body_link).
+       Z-axis rotation allows lateral bending like a real quadruped.
+       This is the PRIMARY turning mechanism — combined with
+       differential stride length for smooth, natural turns.
+  ═══════════════════════════════════════════════════════ -->
+  <joint name="spine_yaw_joint" type="revolute">
+    <parent link="base_link"/><child link="front_body_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.30" upper="0.30" effort="500" velocity="1.5"/>
+    <dynamics damping="12.0" friction="1.0"/>
+  </joint>
+
+  <!-- front_body_link = FRONT body half (thorax/shoulders).
+       Front legs (FL/FR) and head/neck attach here.
+       55% of body mass (bovine weight distribution). -->
+  <link name="front_body_link">
+    <inertial>
+      <mass value="59.0"/>
+      <origin xyz="-0.45 0 0" rpy="0 0 0"/>
+      <inertia ixx="7.4" iyy="7.5" izz="7.8" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <!-- Front barrel half -->
+    <visual>
+      <origin xyz="-0.45 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.90 0.88 0.75"/></geometry>
+      <material name="body_panel"/>
+    </visual>
+    <!-- Withers rise (front shoulder hump) -->
     <visual>
       <origin xyz="-0.50 0 0.475" rpy="0 0 0"/>
       <geometry><box size="0.55 0.78 0.20"/></geometry>
@@ -101,26 +151,21 @@
       <geometry><box size="0.40 0.72 0.12"/></geometry>
       <material name="body_panel"/>
     </visual>
-    <!-- Rump (back — now at +X) -->
-    <visual>
-      <origin xyz="0.55 0 0.425" rpy="0 0 0"/>
-      <geometry><box size="0.40 0.76 0.10"/></geometry>
-      <material name="body_panel"/>
-    </visual>
 
     <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><box size="1.80 0.88 0.85"/></geometry>
+      <origin xyz="-0.45 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.90 0.88 0.85"/></geometry>
     </collision>
   </link>
-  <gazebo reference="base_link">
+  <gazebo reference="front_body_link">
     <material>Gazebo/DarkGrey</material>
   </gazebo>
 
   <!-- ─── HIGHLAND COW HEAD (articulated) ───────────────────── -->
   <!-- Neck: yaw + pitch joints for head motion
        Head: jaw (open/close), eyes (left/right pan)
-       Small servos — total head assembly ~6.5 kg -->
+       Small servos — total head assembly ~6.5 kg
+       Attached to front_body_link (thorax) -->
 
   <!-- Neck yaw — swivel left/right (head faces -X direction of travel) -->
   <link name="neck_yaw_link">
@@ -128,7 +173,7 @@
       <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
   <joint name="neck_yaw_joint" type="revolute">
-    <parent link="base_link"/><child link="neck_yaw_link"/>
+    <parent link="front_body_link"/><child link="neck_yaw_link"/>
     <origin xyz="-0.85 0 0.42" rpy="0 0 3.14159"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.6" upper="0.6" effort="15.0" velocity="2.0"/>
@@ -280,7 +325,7 @@
       <geometry><cylinder radius="0.04" length="0.10"/></geometry></collision>
   </link>
   <joint name="fl_hip_joint" type="revolute">
-    <parent link="base_link"/><child link="fl_hip_link"/>
+    <parent link="front_body_link"/><child link="fl_hip_link"/>
     <origin xyz="0.65 0.44 -0.15" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
@@ -366,7 +411,7 @@
       </origin><geometry><cylinder radius="0.04" length="0.10"/></geometry></collision>
   </link>
   <joint name="fr_hip_joint" type="revolute">
-    <parent link="base_link"/><child link="fr_hip_link"/>
+    <parent link="front_body_link"/><child link="fr_hip_link"/>
     <origin xyz="0.65 -0.44 -0.15" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.35" upper="0.35" effort="200" velocity="2.0"/>
@@ -925,7 +970,7 @@
 
   <!-- ═══════════════════════════════════════════════════════
        ROS2 CONTROL — hardware interface
-       16 commanded joints: 4x hip(Z) + 4x thigh(Y) + 4x knee(Y) + 4x cannon(Y)
+       17 commanded joints: spine(Z) + 4x hip(Z) + 4x thigh(Y) + 4x knee(Y) + 4x cannon(Y)
        Carriage wheels are passive — not included in ros2_control.
   ═══════════════════════════════════════════════════════ -->
 
@@ -933,6 +978,18 @@
     <hardware>
       <plugin>gz_ros2_control/GazeboSimSystem</plugin>
     </hardware>
+
+    <!-- Spine yaw — articulated spine for turning -->
+    <joint name="spine_yaw_joint">
+      <command_interface name="position">
+        <param name="min">-0.30</param><param name="max">0.30</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
 
     <!-- Front-left -->
     <joint name="fl_hip_joint">
