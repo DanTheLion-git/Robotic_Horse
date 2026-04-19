@@ -2,12 +2,14 @@
 # ──────────────────
 # PID gains for Highland Cow: 107kg body, articulated spine, QDD motors.
 # Very heavy body needs extremely stiff thigh+knee to hold stance.
+# Front legs carry 55-70% of body weight during dynamic walking — gains
+# are asymmetrically higher than rear to prevent buckling under load.
 # Horse is free-standing root; cart attached by passive rope joints.
 # 17 commanded joints: spine(Z) + 4 legs x (hip_Z + thigh_Y + knee_Y + cannon_Y)
 
 controller_manager:
   ros__parameters:
-    update_rate: 100
+    update_rate: 200
 
 leg_controller:
   ros__parameters:
@@ -38,20 +40,20 @@ leg_controller:
       - velocity
 
     gains:
-      spine_yaw_joint: { p: 2000.0, i: 0.0, d: 120.0 }
-      fl_hip_joint:    { p: 600.0,  i: 0.0, d:  40.0 }
-      fl_thigh_joint:  { p: 3000.0, i: 0.0, d: 150.0 }
-      fl_knee_joint:   { p: 4500.0, i: 0.0, d: 200.0 }
-      fl_cannon_joint: { p: 800.0,  i: 0.0, d:  45.0 }
-      fr_hip_joint:    { p: 600.0,  i: 0.0, d:  40.0 }
-      fr_thigh_joint:  { p: 3000.0, i: 0.0, d: 150.0 }
-      fr_knee_joint:   { p: 4500.0, i: 0.0, d: 200.0 }
-      fr_cannon_joint: { p: 800.0,  i: 0.0, d:  45.0 }
-      rl_hip_joint:    { p: 600.0,  i: 0.0, d:  40.0 }
-      rl_thigh_joint:  { p: 3000.0, i: 0.0, d: 150.0 }
-      rl_knee_joint:   { p: 4500.0, i: 0.0, d: 200.0 }
-      rl_cannon_joint: { p: 800.0,  i: 0.0, d:  45.0 }
-      rr_hip_joint:    { p: 600.0,  i: 0.0, d:  40.0 }
-      rr_thigh_joint:  { p: 3000.0, i: 0.0, d: 150.0 }
-      rr_knee_joint:   { p: 4500.0, i: 0.0, d: 200.0 }
-      rr_cannon_joint: { p: 800.0,  i: 0.0, d:  45.0 }
+      spine_yaw_joint: { p: 2000.0, i: 0.0,  d: 120.0 }
+      fl_hip_joint:    { p: 900.0,  i: 5.0,  d:  60.0 }
+      fl_thigh_joint:  { p: 6000.0, i: 40.0, d: 300.0 }
+      fl_knee_joint:   { p: 8000.0, i: 50.0, d: 400.0 }
+      fl_cannon_joint: { p: 1500.0, i: 10.0, d:  80.0 }
+      fr_hip_joint:    { p: 900.0,  i: 5.0,  d:  60.0 }
+      fr_thigh_joint:  { p: 6000.0, i: 40.0, d: 300.0 }
+      fr_knee_joint:   { p: 8000.0, i: 50.0, d: 400.0 }
+      fr_cannon_joint: { p: 1500.0, i: 10.0, d:  80.0 }
+      rl_hip_joint:    { p: 800.0,  i: 5.0,  d:  50.0 }
+      rl_thigh_joint:  { p: 5000.0, i: 30.0, d: 250.0 }
+      rl_knee_joint:   { p: 7000.0, i: 40.0, d: 350.0 }
+      rl_cannon_joint: { p: 1200.0, i: 8.0,  d:  65.0 }
+      rr_hip_joint:    { p: 800.0,  i: 5.0,  d:  50.0 }
+      rr_thigh_joint:  { p: 5000.0, i: 30.0, d: 250.0 }
+      rr_knee_joint:   { p: 7000.0, i: 40.0, d: 350.0 }
+      rr_cannon_joint: { p: 1200.0, i: 8.0,  d:  65.0 }

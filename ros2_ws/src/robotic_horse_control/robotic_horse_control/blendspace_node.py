@@ -94,44 +94,45 @@ NEUTRAL_THIGH_REAR   = -0.24
 NEUTRAL_CANNON_REAR  = RECIP_OFFSET - RECIP_RATIO * NEUTRAL_KNEE_REAR
 
 # ── Bovine gait parameters (from biomechanics research) ──────────────────────
-# Highland cow stride length 1.0-1.3m at walk. Scaled to 150cm robot: ~1.10m
+# Highland cow stride length 1.0-1.3m at walk. Scaled to 150cm robot: ~0.90m
 # Step frequency: 1.0-1.25 Hz (60-75 steps/min)
 # Stance phase: ~60% of stride cycle (duty factor >0.5 at walk)
 # Walk sequence: LH → LF → RH → RF (lateral sequence)
+# Stride reduced from 1.10m to prevent front-leg buckling under dynamic load.
 
 WALK = dict(
     phase_offsets={'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
-    swing_frac=0.40,             # 40% swing, 60% stance (bovine standard)
-    step_height_front=0.12,      # front legs lift higher (weight-bearing clearance)
+    swing_frac=0.35,             # 35% swing, 65% stance (longer stance = more stable)
+    step_height_front=0.14,      # front legs lift higher (clearance + anti-stub)
     step_height_rear=0.10,       # rear legs lower arc (propulsive)
-    stride_length=1.10,          # full stride at steady walk [m] (bovine: 1.0-1.3m)
-    min_stride=0.25,             # startup stride [m]
+    stride_length=0.90,          # reduced stride for stability [m]
+    min_stride=0.20,             # startup stride [m]
     period=1.10,                 # ~0.9 Hz stride frequency (bovine walk)
     name='WALK',
 )
 
 TROT = dict(
     phase_offsets={'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0},
-    swing_frac=0.50,             # 50/50 at trot (bovine standard)
-    step_height_front=0.16,      # higher clearance at trot speed
+    swing_frac=0.45,             # 45% swing, 55% stance (more ground contact than 50/50)
+    step_height_front=0.18,      # higher clearance at trot speed
     step_height_rear=0.14,
-    stride_length=1.50,          # full stride at steady trot [m]
-    min_stride=0.35,             # startup stride during trot [m]
-    period=0.75,                 # ~1.3 Hz stride frequency (bovine trot)
+    stride_length=1.20,          # reduced from 1.50 for stability [m]
+    min_stride=0.30,             # startup stride during trot [m]
+    period=0.80,                 # ~1.25 Hz stride frequency
     name='TROT',
 )
 
 GAIT_SEQUENCE = [WALK, TROT]
 
 # Fixed speeds per gait state (teleop sends these exact values)
-WALK_SPEED     = 1.00   # m/s (bovine walk: 1.0-1.5 m/s)
-TROT_SPEED     = 2.00   # m/s (bovine trot)
+WALK_SPEED     = 0.80   # m/s (slightly slower for stability)
+TROT_SPEED     = 1.60   # m/s (reduced from 2.0 for front-leg safety)
 IDLE_THRESHOLD = 0.05
-TROT_THRESHOLD = 1.40
+TROT_THRESHOLD = 1.20
 
 # ── Control limits ────────────────────────────────────────────────────────────
-MAX_SHOULDER = 0.25   # rad  max hip Z-yaw (increased for longer strides)
-MAX_STEP     = 0.60   # m    hard cap on stride half-length (0.60 → max 1.20m stride)
+MAX_SHOULDER = 0.22   # rad  max hip Z-yaw
+MAX_STEP     = 0.50   # m    hard cap on stride half-length
 
 # Spine turning
 SPINE_TURN_GAIN = 0.35   # rad spine yaw per 1.0 rad/s angular velocity
@@ -146,13 +147,21 @@ SPEED_RAMP_TRANSITION = 0.35  # speed fraction at gait transitions
 PITCH_STEP_SCALE = 1.2
 
 # Balance correction
-BALANCE_FOOT_GAIN = 0.40   # m shift per rad of lean
+BALANCE_FOOT_GAIN = 0.50   # m shift per rad of lean (increased for stronger correction)
 
 # Minimum step height so rear legs never drop to zero clearance
-MIN_STEP_HEIGHT = 0.04    # m
+MIN_STEP_HEIGHT = 0.05    # m (raised from 0.04)
 
 CONTACT_EFFORT_THRESHOLD = 45.0
 CONTACT_MIN_SWING_FRAC   = 0.45
+
+# Stance stiffening — virtual spring model
+# During stance, the foot pushes deeper into the ground at mid-stance (when
+# the foot is directly under the hip and vertical load is maximum).
+# This prevents knee buckling by creating higher ground reaction forces.
+STANCE_PUSH_DEPTH     = 0.05   # m  extra push at peak of stance
+STANCE_BASE_DEPTH     = 0.04   # m  minimum ground penetration during stance
+STANCE_PUSH_FRONT_EXTRA = 0.02 # m  front legs push even deeper (55% weight)
 
 # ── Joint order (17 joints — spine + 4 legs × 4) ─────────────────────────────
 JOINT_ORDER = [
@@ -332,10 +341,18 @@ def _foot_target_3d(leg: str, phase: float, linear_v: float, angular_v: float,
         p = local / gait['swing_frac']
         return _elk_swing(p, fx_mean, fy_mean, ankle_height, step_height)
     else:
-        p  = (local - gait['swing_frac']) / (1.0 - gait['swing_frac'])
-        fx = fx_mean * (1.0 - 2.0 * p)
-        fy = fy_mean * (1.0 - 2.0 * p)
-        fz = -(ankle_height + 0.02)   # press 2cm into ground for firm contact
+        # STANCE PHASE — virtual spring ground contact model
+        # The foot pushes into the ground with a sinusoidal profile:
+        # shallow at touchdown/liftoff, deepest at mid-stance (peak load).
+        # Front legs push harder because they carry 55-70% of body weight.
+        p_stance = (local - gait['swing_frac']) / (1.0 - gait['swing_frac'])
+        fx = fx_mean * (1.0 - 2.0 * p_stance)
+        fy = fy_mean * (1.0 - 2.0 * p_stance)
+        # Mid-stance push: sine profile peaks at p_stance=0.5
+        push = STANCE_BASE_DEPTH + STANCE_PUSH_DEPTH * math.sin(math.pi * p_stance)
+        if leg in FRONT_LEGS:
+            push += STANCE_PUSH_FRONT_EXTRA
+        fz = -(ankle_height + push)
         return fx, fy, fz
 
 
