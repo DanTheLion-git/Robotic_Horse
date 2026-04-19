@@ -2,7 +2,7 @@
 <!--
   Highland Cow — PyBullet-compatible URDF
   ========================================
-  Stocky, low-CoM quadruped robot.  100 kg total body mass.
+  Stocky, low-CoM quadruped robot.  86 kg total body mass.
 
   Leg layout (top view):
       FL ———— FR        +X = forward
@@ -41,13 +41,13 @@
   </material>
 
   <!-- ════════════════════════════════════════════════════════════
-       BASE / BODY   (1.40 × 0.60 × 0.40 m, 100 kg)
+       BASE / BODY   (1.40 × 0.60 × 0.40 m, 86 kg)
   ════════════════════════════════════════════════════════════ -->
   <link name="base_link">
     <inertial>
-      <mass value="100.0"/>
+      <mass value="86.0"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="4.33" iyy="17.67" izz="19.33" ixy="0" ixz="0" iyz="0"/>
+      <inertia ixx="3.73" iyy="15.19" izz="16.63" ixy="0" ixz="0" iyz="0"/>
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>

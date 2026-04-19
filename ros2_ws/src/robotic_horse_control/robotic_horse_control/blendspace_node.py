@@ -1,31 +1,28 @@
 """
 blendspace_node.py  —  Highland Cow velocity-driven gait controller.
 
-Robot weight breakdown (realistic motor+frame estimate):
-  16 motors (brushless + planetary gearbox, 3kg avg): 48 kg
-  Aluminium structural frame (extrusion + tubing):    24 kg
-  Electronics, ESCs, sensors, battery:                 8 kg
-  Decoration / artistic dressing:                     35 kg
-  Leg links (4 legs × ~1.3 kg):                        5 kg
-  Total body mass (approximation):                   ~100 kg
+Bovine Leg Mechanics
+────────────────────
+  FRONT legs: passive cannon linkage — cannon = CANNON_LEAN - (thigh + knee)
+    Keeps metacarpal near-vertical via parallelogram geometry.
 
-Highland Cattle geometry reference (proportions only):
-  Body: 1.40 × 0.60 × 0.40 m,  100 kg
-  Thigh (L1): 0.20 m   Shank (L2): 0.18 m
-  Cannon (L3): 0.10 m  Hoof radius: 0.04 m
+  REAR legs: RECIPROCAL APPARATUS — cannon = RECIP_OFFSET - RECIP_RATIO × knee
+    Models the peroneus tertius + SDF tendon coupling between stifle and hock.
+    When stifle flexes, hock flexes proportionally (four-bar linkage).
+    RECIP_RATIO ≈ 0.85 (slightly sub-unity, matching bovine anatomy).
 
-Neutral stance — DEEPLY CROUCHED (knee well bent for compliance & reach):
-  thigh=0.55, knee=-1.10
-  FK hip height: L1*cos(0.55)+L2*cos(-0.55)+L3*cos(0.08)+FOOT_R = 0.464 m
-  ANKLE_HEIGHT: 0.324 m  — leaves 0.197 m of horizontal reach (no more over-extension!)
+QDD Actuation (replaced ballscrew model):
+  All joints use quasi-direct-drive motors. Backdrivable, compliant, torque-sensing.
+  Robot mass: ~86 kg (lighter than 100 kg ballscrew estimate).
 
-Leg configuration:
-  FRONT (FL/FR): elbow-DOWN — carpal bends FORWARD (away from cart)
-  REAR  (RL/RR): elbow-UP   — hock bends BACKWARD  (toward cart)
-  Cannon bone pantograph: cannon = CANNON_LEAN - (thigh + knee)
+Weight distribution: 55% front / 45% rear (bovine standard).
+
+Bovine Gaits:
+  WALK: 4-beat lateral sequence (RL→FL→RR→FR), T=1.1s, duty=0.70
+  TROT: 2-beat diagonal (FL+RR, FR+RL), T=0.70s, duty=0.50
 
 Gait discrete state machine (W=advance, S=decrease, SPACE=IDLE):
-  IDLE → WALK (0.8 m/s, 4-beat lateral) → TROT (1.8 m/s, diagonal pair)
+  IDLE → WALK → TROT
 """
 
 import math
@@ -41,15 +38,15 @@ from builtin_interfaces.msg import Duration
 L1 = 0.20           # thigh  [m]
 L2 = 0.18           # shank  [m]
 L3 = 0.10           # cannon [m]
-CANNON_LEAN = 0.08  # cannon forward lean [rad]
+CANNON_LEAN = 0.08  # front leg: cannon forward lean [rad]
 FOOT_R = 0.04       # hoof radius [m]
 
+# Reciprocal apparatus coupling (rear legs only — bovine stifle-hock)
+RECIP_RATIO  = 0.85    # coupling ratio (slightly sub-unity like real cattle)
+RECIP_OFFSET = -0.47 + RECIP_RATIO * 1.10  # ≈ 0.465 rad
+
 # Hip joint (thigh_joint) height from ground at deeply crouched neutral pose.
-# FK: L1*cos(0.55)+L2*cos(-0.55)+L3*cos(0.08)+FOOT_R
-#   = 0.1705 + 0.1535 + 0.0997 + 0.04 = 0.464 m
 BODY_HEIGHT  = 0.464
-# Distance from thigh joint to ankle (IK target) = BODY_HEIGHT minus cannon+foot
-# = 0.464 - 0.0997 - 0.04 = 0.324 m  → leaves sqrt(0.379²-0.324²)=0.197 m horizontal reach
 ANKLE_HEIGHT = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # = 0.324m
 
 # Hip positions in base_link (x=fwd, y=left, z=up)
@@ -66,44 +63,48 @@ FRONT_LEGS = ('fl', 'fr')
 REAR_LEGS  = ('rl', 'rr')
 
 # Neutral angles — DEEPLY CROUCHED for compliance and horizontal reach
-# cannon = CANNON_LEAN - (thigh + knee):
-#   front: 0.08-(0.55-1.10)=0.63   rear: 0.08-(-0.55+1.10)=-0.47
+# Front: passive cannon = CANNON_LEAN - (thigh + knee)
+# Rear:  reciprocal cannon = RECIP_OFFSET - RECIP_RATIO * knee
 NEUTRAL_THIGH_FRONT  = +0.55
 NEUTRAL_KNEE_FRONT   = -1.10
-NEUTRAL_CANNON_FRONT = +0.63
+NEUTRAL_CANNON_FRONT = CANNON_LEAN - (NEUTRAL_THIGH_FRONT + NEUTRAL_KNEE_FRONT)  # +0.63
 
 NEUTRAL_THIGH_REAR   = -0.55
 NEUTRAL_KNEE_REAR    = +1.10
-NEUTRAL_CANNON_REAR  = -0.47
+NEUTRAL_CANNON_REAR  = RECIP_OFFSET - RECIP_RATIO * NEUTRAL_KNEE_REAR  # ≈ -0.47
 
-# ── Highland Cow gait parameters ──────────────────────────────────────────────
-# Strides scaled to leg geometry: MAX_STEP=0.14m vs 0.197m max reach — plenty of margin.
-# Gait period and speed chosen so Raibert stride never exceeds MAX_STEP.
+# ── Bovine gait parameters ─────────────────────────────────────────────────
+# Walk: 4-beat lateral sequence (RL→FL→RR→FR), duty factor 0.70
+# Trot: 2-beat diagonal pairs, duty factor 0.50
 WALK = dict(
     phase_offsets={'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
     swing_frac=0.30,
-    step_height=0.10,
+    step_height_front=0.06,  # front legs lift higher (weight-bearing)
+    step_height_rear=0.05,   # rear legs lower arc (propulsive)
     min_stride=0.04,
-    period=1.5,
+    period=1.1,              # ~0.9 Hz stride frequency (bovine walk)
     name='WALK',
 )
 
 TROT = dict(
     phase_offsets={'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0},
-    swing_frac=0.40,
-    step_height=0.11,
+    swing_frac=0.50,
+    step_height_front=0.08,  # higher clearance at trot speed
+    step_height_rear=0.07,
     min_stride=0.05,
-    period=0.8,
+    period=0.70,             # ~1.4 Hz stride frequency (bovine trot)
     name='TROT',
 )
 
 GAIT_SEQUENCE = [WALK, TROT]
 
 # Fixed speeds per gait state (teleop sends these exact values)
-WALK_SPEED     = 0.30   # m/s — WALK_SPEED × T_stance / 2 = 0.30×1.05/2 = 0.158m → capped by MAX_STEP ✓
-TROT_SPEED     = 0.65   # m/s — TROT_SPEED × T_stance / 2 = 0.65×0.48/2 = 0.156m → capped by MAX_STEP ✓
+# Walk: speed × T_stance / 2 = 0.30 × 0.77 / 2 = 0.116m → well within MAX_STEP ✓
+# Trot: speed × T_stance / 2 = 0.60 × 0.35 / 2 = 0.105m → well within MAX_STEP ✓
+WALK_SPEED     = 0.30   # m/s
+TROT_SPEED     = 0.60   # m/s
 IDLE_THRESHOLD = 0.05   # linear.x below this = IDLE
-TROT_THRESHOLD = 0.48   # linear.x above this = TROT (between WALK_SPEED=0.30 and TROT_SPEED=0.65)
+TROT_THRESHOLD = 0.45   # linear.x above this = TROT
 
 # ── Control limits ────────────────────────────────────────────────────────────
 MAX_SHOULDER = 0.20   # rad  max hip Z-yaw
@@ -134,7 +135,7 @@ N_JOINTS  = len(JOINT_ORDER)   # 16
 LEG_ORDER = ('fl', 'fr', 'rl', 'rr')
 
 
-# ── IK — front legs (elbow-DOWN) ──────────────────────────────────────────────
+# ── IK — front legs (elbow-DOWN, passive cannon linkage) ──────────────────────
 
 def _ik_3d_front(fx: float, fy: float, fz: float):
     reach = math.sqrt(fx**2 + fz**2)
@@ -153,12 +154,13 @@ def _ik_3d_front(fx: float, fy: float, fz: float):
     alpha  = math.atan2(fx_2d, -fz_2d)
     beta   = math.asin(max(-1.0, min(1.0, L2 * math.sin(abs(knee)) / r)))
     thigh  = alpha + beta
+    # Front leg: passive parallelogram linkage keeps cannon near-vertical
     cannon = CANNON_LEAN - (thigh + knee)
     cannon = max(-2.0, min(2.0, cannon))
     return hip_z, thigh, knee, cannon
 
 
-# ── IK — rear legs (elbow-UP) ─────────────────────────────────────────────────
+# ── IK — rear legs (elbow-UP, reciprocal apparatus) ───────────────────────────
 
 def _ik_3d_rear(fx: float, fy: float, fz: float):
     reach = math.sqrt(fx**2 + fz**2)
@@ -177,23 +179,20 @@ def _ik_3d_rear(fx: float, fy: float, fz: float):
     alpha  = math.atan2(fx_2d, -fz_2d)
     beta   = math.asin(max(-1.0, min(1.0, L2 * math.sin(knee) / r)))
     thigh  = alpha - beta
-    cannon = CANNON_LEAN - (thigh + knee)
+    # Rear leg: reciprocal apparatus couples stifle (knee) to hock (cannon)
+    cannon = RECIP_OFFSET - RECIP_RATIO * knee
     cannon = max(-2.0, min(2.0, cannon))
     return hip_z, thigh, knee, cannon
 
 
-# ── Elk swing profile  (3-phase: Lift → Carry → Plant) ───────────────────────
+# ── Bovine swing profile (3-phase: Lift → Carry → Plant) ──────────────────
 #
-# Phase 0.00–0.30  LIFT   : foot rises from liftoff position
-# Phase 0.30–0.70  CARRY  : foot at peak height, sweeps forward
-# Phase 0.70–1.00  PLANT  : foot descends to target touchdown position
+# Phase 0.00–0.30  LIFT   : hoof rises from liftoff position
+# Phase 0.30–0.70  CARRY  : hoof at peak height, sweeps forward
+# Phase 0.70–1.00  PLANT  : hoof descends to target touchdown position
 #
-# This gives a clear IK-target arc so the foot definitively clears the ground
-# and lands precisely at the Raibert target — like a proper step trajectory.
-#
-# step_height is the WORLD-FRAME clearance guarantee: the pitch compensation
-# argument adds extra lift so the foot ALWAYS clears the ground even when the
-# body pitches forward.
+# Front legs step HIGHER than rear (weight-bearing role requires clearance).
+# Rear legs have a slightly longer stride (propulsive overtracking).
 
 def _elk_swing(p: float, fx_mean: float, fy_mean: float,
                ankle_height: float, step_height: float):
@@ -235,19 +234,17 @@ def _elk_swing(p: float, fx_mean: float, fy_mean: float,
 
 
 def _pitch_compensated_step_height(leg: str, shaft_pitch: float,
-                                   base_step_height: float) -> float:
+                                   gait: dict) -> float:
     """
-    Bidirectional pitch-adaptive step height.
-      - Body pitches FORWARD (positive pitch): front legs step HIGHER, rear LOWER.
-      - Body pitches BACKWARD (negative pitch): rear legs step HIGHER, front LOWER.
-    Uses: extra = lx * sin(pitch) * PITCH_STEP_SCALE
-      Front (lx=+0.55): forward lean → positive extra → more lift
-      Rear  (lx=-0.55): forward lean → negative extra → less lift
-    Clamped to MIN_STEP_HEIGHT so rear legs always retain some clearance.
+    Bidirectional pitch-adaptive step height with front/rear differentiation.
+    Front legs (load-bearing) step higher than rear (propulsive).
     """
+    is_front = leg in FRONT_LEGS
+    base = gait.get('step_height_front' if is_front else 'step_height_rear',
+                    gait.get('step_height', 0.06))
     lx    = LEG_POS[leg][0]
     extra = lx * math.sin(shaft_pitch) * PITCH_STEP_SCALE
-    return max(MIN_STEP_HEIGHT, base_step_height + extra)
+    return max(MIN_STEP_HEIGHT, base + extra)
 
 
 # ── Arc-following foot target (Raibert) ──────────────────────────────────────
@@ -337,11 +334,12 @@ class BlendspaceNode(Node):
             self._gait['period'] / 2.0, self._tick)
 
         self.get_logger().info('=' * 60)
-        self.get_logger().info('  Highland Cow Blendspace  —  Discrete W/S gait states')
-        self.get_logger().info('  Bidirectional pitch-adaptive step heights')
-        self.get_logger().info('  Minimum stride enforced: large steps at slow pace')
+        self.get_logger().info('  Highland Cow — Bovine Gait Controller')
+        self.get_logger().info('  Reciprocal apparatus (rear legs): stifle-hock coupling')
+        self.get_logger().info('  QDD actuation model, 55/45 weight distribution')
+        self.get_logger().info('  WALK: 4-beat lateral (T=1.1s)  TROT: diagonal (T=0.7s)')
         self.get_logger().info('  W = WALK  |  W again = TROT  |  S = step back  |  SPACE = IDLE')
-        self.get_logger().info('  Body mass: ~100 kg (motors+frame+decoration). Crouched stance for leg compliance.')
+        self.get_logger().info('  Body mass: ~86 kg (QDD motors+frame+decoration)')
         self.get_logger().info('=' * 60)
 
     # ── Callbacks ──────────────────────────────────────────────────────────
@@ -406,9 +404,9 @@ class BlendspaceNode(Node):
             'rr': ANKLE_HEIGHT - pitch_adj,
         }
 
-        # Bidirectional pitch-adaptive step heights
+        # Bidirectional pitch-adaptive step heights (front/rear differentiated)
         step_heights = {
-            leg: _pitch_compensated_step_height(leg, -pitch, gait['step_height'])
+            leg: _pitch_compensated_step_height(leg, -pitch, gait)
             for leg in LEG_ORDER
         }
 
@@ -499,11 +497,11 @@ class BlendspaceNode(Node):
         rl_th = NEUTRAL_THIGH_REAR  + pitch_corr
         rr_th = NEUTRAL_THIGH_REAR  + pitch_corr
 
-        # Recalculate cannon for adjusted thigh (pantograph)
+        # Recalculate cannon: front = passive linkage, rear = reciprocal apparatus
         fl_ca = CANNON_LEAN - (fl_th + NEUTRAL_KNEE_FRONT)
         fr_ca = CANNON_LEAN - (fr_th + NEUTRAL_KNEE_FRONT)
-        rl_ca = CANNON_LEAN - (rl_th + NEUTRAL_KNEE_REAR)
-        rr_ca = CANNON_LEAN - (rr_th + NEUTRAL_KNEE_REAR)
+        rl_ca = RECIP_OFFSET - RECIP_RATIO * NEUTRAL_KNEE_REAR
+        rr_ca = RECIP_OFFSET - RECIP_RATIO * NEUTRAL_KNEE_REAR
 
         msg_out = JointTrajectory()
         msg_out.joint_names = JOINT_ORDER

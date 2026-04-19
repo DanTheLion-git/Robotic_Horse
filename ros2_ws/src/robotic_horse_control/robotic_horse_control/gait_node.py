@@ -1,16 +1,17 @@
 """
-gait_node.py  —  ROS2 node that runs the trot gait planner and publishes
+gait_node.py  —  ROS2 node that runs a bovine gait planner and publishes
 joint trajectory commands to the leg_controller.
 
 Topics published:
     /leg_controller/joint_trajectory  [trajectory_msgs/JointTrajectory]
 
-The gait cycle repeats indefinitely.  Joint angles are computed using the
-Highland Cow kinematics (L1=0.20, L2=0.18, 3-segment legs with cannon bone).
+The gait cycle repeats indefinitely. Joint angles computed using Highland Cow
+kinematics with bovine leg mechanics:
+  Front legs: passive cannon linkage (parallelogram)
+  Rear legs:  reciprocal apparatus (stifle-hock tendon coupling)
 
-NOTE: The blendspace_node.py is the preferred controller for the Highland Cow
-build (supports WALK/TROT gaits, IMU balance, teleop). This gait_node is kept
-as a simple trot-only fallback.
+NOTE: The blendspace_node.py is the preferred controller (supports teleop,
+IMU balance, gait transitions). This gait_node is a simple walk-only fallback.
 """
 
 import math
@@ -24,19 +25,25 @@ from builtin_interfaces.msg import Duration
 L1 = 0.20          # thigh length [m]
 L2 = 0.18          # shank length [m]
 L3 = 0.10          # cannon bone length [m]
-CANNON_LEAN = 0.08 # cannon forward lean [rad]
+CANNON_LEAN = 0.08 # front leg: cannon forward lean [rad]
 FOOT_R = 0.04      # hoof radius [m]
 
-# Ankle height = hip_height - cannon - hoof
-BODY_HEIGHT   = 0.464  # nominal hip-to-ground height [m]
+# Reciprocal apparatus (rear legs)
+RECIP_RATIO  = 0.85
+RECIP_OFFSET = -0.47 + RECIP_RATIO * 1.10  # ≈ 0.465
+
+BODY_HEIGHT   = 0.464
 ANKLE_HEIGHT  = BODY_HEIGHT - L3 * math.cos(CANNON_LEAN) - FOOT_R  # ~0.324m
 
-STEP_LENGTH   = 0.10   # stride length [m]
-STEP_HEIGHT   = 0.06   # foot lift [m]
-SWING_FRAC    = 0.40   # fraction of cycle in swing
-MAX_STEP      = 0.14   # hard cap on stride half-length [m]
+# Bovine walk gait parameters
+STEP_LENGTH   = 0.10
+STEP_HEIGHT_FRONT = 0.06
+STEP_HEIGHT_REAR  = 0.05
+SWING_FRAC    = 0.30   # 30% swing / 70% stance (bovine walk duty factor)
+MAX_STEP      = 0.14
 
-PHASE_OFFSET = {'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0}
+# 4-beat lateral sequence: RL → FL → RR → FR
+PHASE_OFFSET = {'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75}
 
 JOINT_ORDER = [
     'fl_hip_joint', 'fl_thigh_joint', 'fl_knee_joint', 'fl_cannon_joint',
@@ -49,40 +56,64 @@ FRONT_LEGS = ('fl', 'fr')
 REAR_LEGS  = ('rl', 'rr')
 
 
-# ── Pure kinematics (no external imports needed in ROS2 node) ──────────────
-
 def _ik(foot_x: float, foot_z: float, elbow_up: bool = False):
-    """2-link IK targeting ankle.  Returns (theta_hip, theta_knee)."""
+    """2-link IK targeting ankle. Returns (theta_hip, theta_knee)."""
     r = math.sqrt(foot_x**2 + foot_z**2)
     r = max(abs(L1 - L2) + 0.001, min(r, L1 + L2 - 0.001))
     cos_k = (r**2 - L1**2 - L2**2) / (2 * L1 * L2)
     cos_k = max(-1.0, min(1.0, cos_k))
     if elbow_up:
-        theta_knee = +math.acos(cos_k)  # rear leg (hock backward)
+        theta_knee = +math.acos(cos_k)
         alpha = math.atan2(foot_x, -foot_z)
         beta  = math.asin(max(-1.0, min(1.0, L2 * math.sin(theta_knee) / r)))
         return alpha - beta, theta_knee
     else:
-        theta_knee = -math.acos(cos_k)  # front leg (carpal forward)
+        theta_knee = -math.acos(cos_k)
         alpha = math.atan2(foot_x, -foot_z)
         beta  = math.asin(max(-1.0, min(1.0, L2 * math.sin(abs(theta_knee)) / r)))
         return alpha + beta, theta_knee
 
 
+def _cannon(leg: str, thigh: float, knee: float) -> float:
+    """Cannon angle: front = passive linkage, rear = reciprocal apparatus."""
+    if leg in REAR_LEGS:
+        return RECIP_OFFSET - RECIP_RATIO * knee
+    return CANNON_LEAN - (thigh + knee)
+
+
 def _foot_target(leg: str, phase: float):
-    """Return (foot_x, foot_z) in hip frame for a given gait phase (ankle target)."""
+    """Return (foot_x, foot_z) in hip frame for a given gait phase."""
+    is_rear = leg in REAR_LEGS
+    step_h = STEP_HEIGHT_REAR if is_rear else STEP_HEIGHT_FRONT
+
     local = (phase - PHASE_OFFSET[leg]) % 1.0
     if local < SWING_FRAC:
+        # 3-phase swing arc (bovine lift-carry-plant)
         p = local / SWING_FRAC
-        x = -STEP_LENGTH / 2 + STEP_LENGTH * p
+        LIFT_END = 0.30
+        CARRY_END = 0.70
+        if p < LIFT_END:
+            t = p / LIFT_END
+            lift = step_h * math.sin(math.pi * 0.5 * t)
+            t_fwd = t * 0.15
+        elif p < CARRY_END:
+            t = (p - LIFT_END) / (CARRY_END - LIFT_END)
+            lift = step_h
+            t_fwd = 0.15 + t * 0.70
+        else:
+            t = (p - CARRY_END) / (1.0 - CARRY_END)
+            lift = step_h * math.cos(math.pi * 0.5 * t)
+            t_fwd = 0.85 + t * 0.15
+        x = -STEP_LENGTH / 2 + STEP_LENGTH * t_fwd
         x = max(-MAX_STEP, min(MAX_STEP, x))
-        z = -(ANKLE_HEIGHT - STEP_HEIGHT * math.sin(math.pi * p))
+        z = -(ANKLE_HEIGHT - lift)
     else:
+        # Stance: foot on ground, body advances
         p = (local - SWING_FRAC) / (1.0 - SWING_FRAC)
-        half = STEP_LENGTH / (2 * ANKLE_HEIGHT)
-        x = (half - 2 * half * p) * ANKLE_HEIGHT
+        half = STEP_LENGTH / 2
+        x = half * (1.0 - 2.0 * p)
         x = max(-MAX_STEP, min(MAX_STEP, x))
-        z = -ANKLE_HEIGHT
+        z = -(ANKLE_HEIGHT + 0.015)  # press 15mm for contact
     return x, z
 
 
@@ -96,16 +127,13 @@ class GaitNode(Node):
             10,
         )
 
-        # Gait parameters
-        self._gait_period = 1.0    # seconds per cycle
-        self._n_points    = 50     # trajectory points per publish
+        self._gait_period = 1.1    # bovine walk period
+        self._n_points    = 50
         self._dt          = self._gait_period / self._n_points
 
-        # Publish a full trajectory every half-cycle so the controller always
-        # has a look-ahead buffer.
         self._phase = 0.0
         self.create_timer(self._gait_period / 2, self._publish_trajectory)
-        self.get_logger().info('Gait node started — trot gait active.')
+        self.get_logger().info('Gait node started — bovine walk (4-beat lateral)')
 
     def _publish_trajectory(self):
         msg = JointTrajectory()
@@ -118,8 +146,8 @@ class GaitNode(Node):
                 fx, fz = _foot_target(leg, phase)
                 elbow_up = leg in REAR_LEGS
                 th, tk = _ik(fx, fz, elbow_up=elbow_up)
-                cannon = CANNON_LEAN - (th + tk)
-                positions += [0.0, th, tk, cannon]  # hip_yaw=0, thigh, knee, cannon
+                cannon = _cannon(leg, th, tk)
+                positions += [0.0, th, tk, cannon]
 
             pt = JointTrajectoryPoint()
             pt.positions = positions

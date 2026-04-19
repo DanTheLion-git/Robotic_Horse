@@ -4,7 +4,7 @@
   ===================================
   This is the Gazebo-compatible version of the robot description.
   It extends the base URDF with:
-    • <ros2_control> hardware interface tags  (8 controlled joints)
+    • <ros2_control> hardware interface tags  (16 controlled joints)
     • <gazebo> plugin tag  (loads gazebo_ros2_control)
     • <gazebo> material + contact tags per link
 
@@ -17,11 +17,11 @@
       {fl,fr,rl,rr}_thigh_joint  — hip flexion/extension  (position ctrl)
       {fl,fr,rl,rr}_knee_joint   — knee driven by ballscrew (position ctrl)
 
-  Fixed joints (set at 0, no actuator needed for cart-supported robot):
+  Fixed joints (set at 0, no actuator needed for freestanding robot):
       {fl,fr,rl,rr}_hip_joint    — lateral hip bracket
 
   Physical parameters (edit here and in ros2_control.yaml):
-    Body mass  : 20 kg
+    Body mass  : 86 kg
     Thigh      : 0.45 m,  1.5 kg
     Shank      : 0.50 m,  1.0 kg
     Foot sphere: r=0.04 m, 0.2 kg
@@ -73,13 +73,13 @@
   <!-- ═══════════════════════════════════════════════════════
        BASE LINK
   ═══════════════════════════════════════════════════════ -->
-  <!-- Body mass ~100 kg: motors(48)+frame(24)+electronics(8)+decoration(35)+legs(5).
-       Inertia (100 kg, 1.40x0.60x0.40 m box): Ixx=4.33, Iyy=17.67, Izz=19.33 kg·m² -->
+  <!-- Body mass ~86 kg: motors(48)+frame(24)+electronics(8)+decoration(1)+legs(5).
+       Inertia (86 kg, 1.40x0.60x0.40 m box): Ixx=3.73, Iyy=15.19, Izz=16.63 kg·m² -->
   <link name="base_link">
     <inertial>
-      <mass value="100.0"/>
+      <mass value="86.0"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="4.33" iyy="17.67" izz="19.33" ixy="0" ixz="0" iyz="0"/>
+      <inertia ixx="3.73" iyy="15.19" izz="16.63" ixy="0" ixz="0" iyz="0"/>
     </inertial>
     <!-- Main body panel -->
     <visual>
@@ -490,157 +490,7 @@
        No passive joints (cart removed — robot is freestanding).
   ═══════════════════════════════════════════════════════ -->
 
-  <!-- ROPE and CART - horse is free-standing root; cart follows via 2.5m rope -->
-
-  <link name="horse_hitch_link">
-    <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.002" iyy="0.002" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><sphere radius="0.06"/></geometry><material name="iron"/></visual>
-  </link>
-  <joint name="horse_hitch_joint" type="fixed">
-    <parent link="base_link"/><child link="horse_hitch_link"/>
-    <origin xyz="-0.55 0 -0.12" rpy="0 0 0"/>
-  </joint>
-
-  <link name="rope_yaw_link">
-    <inertial><mass value="0.3"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
-  </link>
-  <joint name="rope_horse_yaw" type="revolute">
-    <parent link="horse_hitch_link"/><child link="rope_yaw_link"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <axis xyz="0 0 1"/>
-    <limit lower="-1.57" upper="1.57" effort="0" velocity="5.0"/>
-    <dynamics damping="6.0" friction="1.5"/>
-  </joint>
-
-  <!-- rope_body_link: visual is a 2.5m box extending rearward from horse end -->
-  <link name="rope_body_link">
-    <inertial><mass value="2.0"/><origin xyz="-1.25 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.003" iyy="1.042" izz="1.042" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="-1.25 0 0" rpy="0 0 0">
-      </origin><geometry><box size="2.50 0.04 0.04"/></geometry><material name="dark_grey"/></visual>
-  </link>
-  <joint name="rope_horse_pitch" type="revolute">
-    <parent link="rope_yaw_link"/><child link="rope_body_link"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="-1.047" upper="1.047" effort="0" velocity="5.0"/>
-    <dynamics damping="3.0" friction="0.5"/>
-  </joint>
-  <gazebo reference="rope_body_link"><material>Gazebo/DarkGrey</material></gazebo>
-
-  <link name="rope_cart_pitch_link">
-    <inertial><mass value="0.3"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
-  </link>
-  <joint name="rope_cart_pitch" type="revolute">
-    <parent link="rope_body_link"/><child link="rope_cart_pitch_link"/>
-    <origin xyz="-2.50 0 0" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="-1.047" upper="1.047" effort="0" velocity="5.0"/>
-    <dynamics damping="3.0" friction="0.5"/>
-  </joint>
-
-  <link name="cart_hitch_link">
-    <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.002" iyy="0.002" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><sphere radius="0.06"/></geometry><material name="iron"/></visual>
-  </link>
-  <joint name="rope_cart_yaw" type="revolute">
-    <parent link="rope_cart_pitch_link"/><child link="cart_hitch_link"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <axis xyz="0 0 1"/>
-    <limit lower="-1.57" upper="1.57" effort="0" velocity="5.0"/>
-    <dynamics damping="6.0" friction="1.5"/>
-  </joint>
-
-  <link name="cart_base">
-    <inertial>
-      <mass value="350.0"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="71.5" iyy="313.0" izz="355.8" ixy="0" ixz="0" iyz="0"/>
-    </inertial>
-    <visual><origin xyz="0 0 0" rpy="0 0 0">
-      </origin><geometry><box size="3.2 1.4 0.7"/></geometry><material name="wood"/></visual>
-    <visual><origin xyz="0.2 0 0.35" rpy="0 0 0">
-      </origin><geometry><box size="2.6 1.35 0.05"/></geometry><material name="dark_grey"/></visual>
-    <collision><origin xyz="0 0 0" rpy="0 0 0">
-      </origin><geometry><box size="3.2 1.4 0.7"/></geometry></collision>
-  </link>
-  <joint name="cart_base_joint" type="fixed">
-    <parent link="cart_hitch_link"/><child link="cart_base"/>
-    <origin xyz="-1.60 0 0" rpy="0 0 0"/>
-  </joint>
-  <gazebo reference="cart_base"><material>Gazebo/WoodPallet</material></gazebo>
-
-  <link name="cart_fl_wheel_link">
-    <inertial><mass value="8.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.515" iyy="1.000" izz="0.515" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 0" rpy="1.5708 0 0">
-      </origin><geometry><cylinder radius="0.50" length="0.15"/></geometry><material name="black"/></visual>
-    <collision><origin xyz="0 0 0" rpy="1.5708 0 0">
-      </origin><geometry><cylinder radius="0.50" length="0.15"/></geometry></collision>
-  </link>
-  <joint name="cart_fl_wheel_joint" type="continuous">
-    <parent link="cart_base"/><child link="cart_fl_wheel_link"/>
-    <origin xyz="1.2 0.72 -0.35" rpy="0 0 0"/><axis xyz="0 1 0"/>
-    <dynamics damping="0.4" friction="0.5"/>
-  </joint>
-  <gazebo reference="cart_fl_wheel_link">
-    <material>Gazebo/FlatBlack</material><mu1>0.85</mu1><mu2>0.85</mu2><kp>1000000</kp><kd>80</kd></gazebo>
-
-  <link name="cart_fr_wheel_link">
-    <inertial><mass value="8.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.515" iyy="1.000" izz="0.515" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 0" rpy="1.5708 0 0">
-      </origin><geometry><cylinder radius="0.50" length="0.15"/></geometry><material name="black"/></visual>
-    <collision><origin xyz="0 0 0" rpy="1.5708 0 0">
-      </origin><geometry><cylinder radius="0.50" length="0.15"/></geometry></collision>
-  </link>
-  <joint name="cart_fr_wheel_joint" type="continuous">
-    <parent link="cart_base"/><child link="cart_fr_wheel_link"/>
-    <origin xyz="1.2 -0.72 -0.35" rpy="0 0 0"/><axis xyz="0 1 0"/>
-    <dynamics damping="0.4" friction="0.5"/>
-  </joint>
-  <gazebo reference="cart_fr_wheel_link">
-    <material>Gazebo/FlatBlack</material><mu1>0.85</mu1><mu2>0.85</mu2><kp>1000000</kp><kd>80</kd></gazebo>
-
-  <link name="cart_rl_wheel_link">
-    <inertial><mass value="8.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.515" iyy="1.000" izz="0.515" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 0" rpy="1.5708 0 0">
-      </origin><geometry><cylinder radius="0.50" length="0.15"/></geometry><material name="black"/></visual>
-    <collision><origin xyz="0 0 0" rpy="1.5708 0 0">
-      </origin><geometry><cylinder radius="0.50" length="0.15"/></geometry></collision>
-  </link>
-  <joint name="cart_rl_wheel_joint" type="continuous">
-    <parent link="cart_base"/><child link="cart_rl_wheel_link"/>
-    <origin xyz="-1.2 0.72 -0.35" rpy="0 0 0"/><axis xyz="0 1 0"/>
-    <dynamics damping="0.4" friction="0.5"/>
-  </joint>
-  <gazebo reference="cart_rl_wheel_link">
-    <material>Gazebo/FlatBlack</material><mu1>0.85</mu1><mu2>0.85</mu2><kp>1000000</kp><kd>80</kd></gazebo>
-
-  <link name="cart_rr_wheel_link">
-    <inertial><mass value="8.0"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.515" iyy="1.000" izz="0.515" ixy="0" ixz="0" iyz="0"/></inertial>
-    <visual><origin xyz="0 0 0" rpy="1.5708 0 0">
-      </origin><geometry><cylinder radius="0.50" length="0.15"/></geometry><material name="black"/></visual>
-    <collision><origin xyz="0 0 0" rpy="1.5708 0 0">
-      </origin><geometry><cylinder radius="0.50" length="0.15"/></geometry></collision>
-  </link>
-  <joint name="cart_rr_wheel_joint" type="continuous">
-    <parent link="cart_base"/><child link="cart_rr_wheel_link"/>
-    <origin xyz="-1.2 -0.72 -0.35" rpy="0 0 0"/><axis xyz="0 1 0"/>
-    <dynamics damping="0.4" friction="0.5"/>
-  </joint>
-  <gazebo reference="cart_rr_wheel_link">
-    <material>Gazebo/FlatBlack</material><mu1>0.85</mu1><mu2>0.85</mu2><kp>1000000</kp><kd>80</kd></gazebo>
-
-  <ros2_control name="GazeboSystem" type="system">
+  <ros2_controlname="GazeboSystem" type="system">
     <hardware>
       <plugin>gz_ros2_control/GazeboSimSystem</plugin>
     </hardware>

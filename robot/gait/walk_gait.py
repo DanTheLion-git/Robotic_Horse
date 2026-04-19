@@ -1,137 +1,241 @@
 """
-Trot gait planner for the Highland Cow quadruped.
+Bovine gait planner for the Highland Cow quadruped.
 
-A trot moves diagonal leg pairs simultaneously:
-  Phase 0: FL + RR swing,  FR + RL stance
-  Phase 1: FR + RL swing,  FL + RR stance
+Two gaits modeled after real cattle biomechanics:
 
-Each leg cycles through:
-  STANCE  – foot on ground, hip moves body forward
-  LIFT    – knee bends (raises foot)
-  SWING   – hip swings forward
-  LOWER   – knee extends (lowers foot to ground)
+WALK — 4-beat lateral sequence
+  Footfall order: RL → FL → RR → FR  (each 25% apart)
+  Duty factor: 0.70 (each foot on ground 70% of cycle)
+  Swing fraction: 0.30
+  Period: 1.1s (≈0.9 Hz stride frequency)
+  Speed: 0.25–0.35 m/s
 
-Joint angle trajectories are parameterised by phase [0, 1).
+TROT — 2-beat diagonal pairs
+  Diagonal pairs: FL+RR, FR+RL
+  Duty factor: 0.50 (each foot on ground 50% of cycle)
+  Swing fraction: 0.50
+  Period: 0.7s (≈1.4 Hz stride frequency)
+  Speed: 0.50–0.70 m/s
+
+Bovine swing trajectory — 3-phase arc:
+  LIFT  (0–30%):  Hoof rises from liftoff position
+  CARRY (30–70%): Hoof at peak height, sweeps forward
+  PLANT (70–100%): Hoof descends to touchdown position
+
+Weight distribution: 55% front / 45% rear
+Front legs step slightly higher (load-bearing, need clearance).
+Rear legs overtrack slightly (propulsive role).
 
 Highland Cow build — short thick legs, deep crouch stance.
 """
 
+import math
 import numpy as np
-from robot.kinematics.leg_kinematics import inverse_kinematics, ANKLE_HEIGHT
+from robot.kinematics.leg_kinematics import (
+    inverse_kinematics, ANKLE_HEIGHT, L1, L2,
+    cannon_angle_front, cannon_angle_rear,
+)
 
 
-# ── Gait parameters (Highland Cow) ────────────────────────────────
-STEP_LENGTH    = 0.10    # stride length [m] — conservative for short legs
-STEP_HEIGHT    = 0.06    # foot lift height [m]
-BODY_HEIGHT    = ANKLE_HEIGHT  # IK targets ankle, not hoof  [m] (~0.324)
-SWING_FRACTION = 0.40    # fraction of gait cycle spent swinging
-
+# ── Leg identifiers ───────────────────────────────────────────────
 LEG_NAMES = ["fl", "fr", "rl", "rr"]
+FRONT_LEGS = {"fl", "fr"}
+REAR_LEGS  = {"rl", "rr"}
 
-# Diagonal pairs for trot gait
-TROT_PAIRS = [
-    {"swing": ["fl", "rr"], "stance": ["fr", "rl"]},
-    {"swing": ["fr", "rl"], "stance": ["fl", "rr"]},
-]
 
-# Phase offset per leg (trot: diagonals 0.5 apart)
-PHASE_OFFSET = {
-    "fl": 0.0,
-    "rr": 0.0,
-    "fr": 0.5,
-    "rl": 0.5,
+# ── WALK gait — 4-beat lateral sequence ───────────────────────────
+# Real cattle: LH → LF → RH → RF, each 25% apart
+WALK = {
+    'name': 'WALK',
+    'phase_offsets': {'rl': 0.0, 'fl': 0.25, 'rr': 0.50, 'fr': 0.75},
+    'swing_frac': 0.30,        # 30% swing / 70% stance (duty factor 0.70)
+    'period': 1.1,             # seconds per full stride cycle
+    'step_height_front': 0.06, # front legs lift higher (weight-bearing clearance)
+    'step_height_rear': 0.05,  # rear legs slightly lower arc
+    'min_stride': 0.04,        # minimum stride half-length [m]
+    'speed': 0.30,             # target walking speed [m/s]
 }
 
-# Maximum reachable stride half-length (safety cap)
-MAX_STEP = 0.14  # m — well within 0.197m horizontal reach
+# ── TROT gait — 2-beat diagonal ───────────────────────────────────
+# Diagonal pairs: FL+RR, FR+RL
+TROT = {
+    'name': 'TROT',
+    'phase_offsets': {'fl': 0.0, 'rr': 0.0, 'fr': 0.50, 'rl': 0.50},
+    'swing_frac': 0.50,        # 50% swing / 50% stance (duty factor 0.50)
+    'period': 0.70,            # faster cadence for trot
+    'step_height_front': 0.08, # higher clearance needed at trot speed
+    'step_height_rear': 0.07,
+    'min_stride': 0.05,
+    'speed': 0.60,             # target trotting speed [m/s]
+}
+
+GAIT_SEQUENCE = [WALK, TROT]
+
+# ── Gait parameters ───────────────────────────────────────────────
+STEP_LENGTH    = 0.10    # base stride half-length [m]
+BODY_HEIGHT    = ANKLE_HEIGHT  # IK targets ankle, not hoof [m] (~0.324)
+MAX_STEP       = 0.14    # hard cap on stride half-length (within 0.197m reach)
+
+# ── Overtracking ──────────────────────────────────────────────────
+# Rear hooves land slightly ahead of where the ipsilateral front hoof was
+OVERTRACK_FRONT = 0.0    # front legs: no offset
+OVERTRACK_REAR  = 0.01   # rear legs: 1cm forward of front footprint
 
 
-def _stance_hip_angle(phase: float) -> float:
+def _swing_trajectory(phase: float, step_height: float,
+                      half_stride: float) -> tuple[float, float]:
     """
-    Hip angle during stance: sweeps from +step/2 to −step/2 in hip frame.
-    phase ∈ [0, 1)
-    """
-    half = STEP_LENGTH / (2 * BODY_HEIGHT)
-    return half - 2 * half * phase   # linear sweep
+    3-phase bovine swing arc.
 
+    Phase 0.00–0.30: LIFT   — hoof rises from liftoff position
+    Phase 0.30–0.70: CARRY  — hoof at peak height, sweeps forward
+    Phase 0.70–1.00: PLANT  — hoof descends to touchdown position
 
-def _swing_trajectory(phase: float) -> tuple[float, float]:
-    """
-    Foot trajectory during swing phase.
+    Parameters
+    ----------
+    phase       : swing progress [0, 1)
+    step_height : vertical clearance [m]
+    half_stride : horizontal half-stride [m]
 
-    phase ∈ [0, 1) within the swing sub-phase.
     Returns (foot_x, foot_z) in hip frame — targeting ankle position.
     """
-    # Horizontal: half-sine from −step/2 to +step/2
-    foot_x = -STEP_LENGTH / 2 + STEP_LENGTH * phase
-    foot_x = max(-MAX_STEP, min(MAX_STEP, foot_x))
+    LIFT_END  = 0.30
+    CARRY_END = 0.70
 
-    # Vertical: raised by a half-sine arc
-    foot_z = -(BODY_HEIGHT - STEP_HEIGHT * np.sin(np.pi * phase))
+    if phase < LIFT_END:
+        # LIFT: foot rises from liftoff (-half_stride) with sine ramp
+        t = phase / LIFT_END
+        lift = step_height * math.sin(math.pi * 0.5 * t)
+        t_fwd = t * 0.15
+        foot_x = -half_stride + 2.0 * half_stride * t_fwd
+    elif phase < CARRY_END:
+        # CARRY: foot at peak height, sweeps forward
+        t = (phase - LIFT_END) / (CARRY_END - LIFT_END)
+        lift = step_height
+        t_fwd = 0.15 + t * 0.70
+        foot_x = -half_stride + 2.0 * half_stride * t_fwd
+    else:
+        # PLANT: foot descends to touchdown (+half_stride) with cosine ramp
+        t = (phase - CARRY_END) / (1.0 - CARRY_END)
+        lift = step_height * math.cos(math.pi * 0.5 * t)
+        t_fwd = 0.85 + t * 0.15
+        foot_x = -half_stride + 2.0 * half_stride * t_fwd
+
+    foot_x = max(-MAX_STEP, min(MAX_STEP, foot_x))
+    foot_z = -(BODY_HEIGHT - lift)
 
     return foot_x, foot_z
 
 
-def joint_angles_at_phase(leg: str, global_phase: float) -> tuple[float, float]:
+def _stance_trajectory(phase: float, half_stride: float) -> tuple[float, float]:
     """
-    Return (theta_hip, theta_knee) for a given leg at a given gait phase.
+    Stance phase: foot fixed on ground, body moves forward over it.
+
+    The foot sweeps from +half_stride backward to -half_stride as the
+    body advances. Foot pressed slightly into ground for firm contact.
 
     Parameters
     ----------
-    leg          : one of 'fl', 'fr', 'rl', 'rr'
+    phase       : stance progress [0, 1)
+    half_stride : horizontal half-stride [m]
+
+    Returns (foot_x, foot_z) in hip frame.
+    """
+    foot_x = half_stride * (1.0 - 2.0 * phase)
+    foot_z = -(BODY_HEIGHT + 0.015)  # press 15mm into ground for contact
+    return foot_x, foot_z
+
+
+def joint_angles_at_phase(leg: str, global_phase: float,
+                          gait: dict = None) -> tuple[float, float, float]:
+    """
+    Return (theta_hip, theta_knee, theta_cannon) for a given leg at a gait phase.
+
+    Parameters
+    ----------
+    leg          : 'fl', 'fr', 'rl', 'rr'
     global_phase : gait phase ∈ [0, 1)
+    gait         : gait parameters dict (defaults to WALK)
 
     Returns
     -------
-    (theta_hip, theta_knee)  [rad]
+    (theta_hip, theta_knee, theta_cannon) [rad]
     """
-    local_phase = (global_phase - PHASE_OFFSET[leg]) % 1.0
+    if gait is None:
+        gait = WALK
 
-    if local_phase < SWING_FRACTION:
-        # Swing phase
-        swing_phase = local_phase / SWING_FRACTION
-        foot_x, foot_z = _swing_trajectory(swing_phase)
+    is_rear = leg in REAR_LEGS
+    elbow_up = is_rear
+
+    # Get leg-specific parameters
+    step_h = gait['step_height_rear'] if is_rear else gait['step_height_front']
+    overtrack = OVERTRACK_REAR if is_rear else OVERTRACK_FRONT
+    half_stride = STEP_LENGTH / 2.0 + overtrack
+
+    local_phase = (global_phase - gait['phase_offsets'][leg]) % 1.0
+
+    if local_phase < gait['swing_frac']:
+        swing_phase = local_phase / gait['swing_frac']
+        foot_x, foot_z = _swing_trajectory(swing_phase, step_h, half_stride)
     else:
-        # Stance phase
-        stance_phase = (local_phase - SWING_FRACTION) / (1.0 - SWING_FRACTION)
-        foot_x = _stance_hip_angle(stance_phase) * BODY_HEIGHT   # approx x
-        foot_z = -BODY_HEIGHT
+        stance_phase = (local_phase - gait['swing_frac']) / (1.0 - gait['swing_frac'])
+        foot_x, foot_z = _stance_trajectory(stance_phase, half_stride)
 
     try:
-        return inverse_kinematics(foot_x, foot_z)
+        theta_hip, theta_knee = inverse_kinematics(foot_x, foot_z,
+                                                   elbow_up=elbow_up)
     except ValueError:
-        # Clamp to reachable workspace edge
-        from robot.kinematics.leg_kinematics import L1, L2
         max_reach = L1 + L2
-        r = np.sqrt(foot_x**2 + foot_z**2)
-        scale = (0.90 * max_reach / r)    # 90% of max reach
-        return inverse_kinematics(foot_x * scale, foot_z * scale)
+        r = math.sqrt(foot_x**2 + foot_z**2)
+        scale = 0.90 * max_reach / r
+        theta_hip, theta_knee = inverse_kinematics(foot_x * scale, foot_z * scale,
+                                                   elbow_up=elbow_up)
+
+    # Cannon angle: reciprocal apparatus for rear, passive linkage for front
+    if is_rear:
+        theta_cannon = cannon_angle_rear(theta_knee)
+    else:
+        theta_cannon = cannon_angle_front(theta_hip, theta_knee)
+
+    return theta_hip, theta_knee, theta_cannon
 
 
-def generate_gait_trajectory(n_steps: int = 200) -> dict:
+def generate_gait_trajectory(n_steps: int = 200,
+                             gait: dict = None) -> dict:
     """
     Generate a full gait cycle trajectory for all four legs.
 
     Parameters
     ----------
     n_steps : number of time steps per full gait cycle
+    gait    : gait parameters dict (defaults to WALK)
 
     Returns
     -------
-    dict mapping leg name → {'theta_hip': array, 'theta_knee': array, 'phase': array}
+    dict mapping leg name → {
+        'theta_hip': array, 'theta_knee': array, 'theta_cannon': array,
+        'phase': array
+    }
     """
+    if gait is None:
+        gait = WALK
+
     phases = np.linspace(0, 1, n_steps, endpoint=False)
     result = {}
 
     for leg in LEG_NAMES:
-        hips   = np.zeros(n_steps)
-        knees  = np.zeros(n_steps)
+        hips    = np.zeros(n_steps)
+        knees   = np.zeros(n_steps)
+        cannons = np.zeros(n_steps)
+
         for i, p in enumerate(phases):
-            hips[i], knees[i] = joint_angles_at_phase(leg, p)
+            hips[i], knees[i], cannons[i] = joint_angles_at_phase(leg, p, gait)
+
         result[leg] = {
-            "theta_hip":  hips,
-            "theta_knee": knees,
-            "phase":      phases,
+            "theta_hip":    hips,
+            "theta_knee":   knees,
+            "theta_cannon": cannons,
+            "phase":        phases,
         }
 
     return result

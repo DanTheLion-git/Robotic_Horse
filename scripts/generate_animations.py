@@ -58,15 +58,32 @@ JOINT_NAMES = [
 ]
 
 # Trot phase offsets: FL+RR move together, FR+RL move together
-PHASE_OFFSET = {"fl": 0.0, "fr": 0.5, "rl": 0.5, "rr": 0.0}
+TROT_PHASE = {"fl": 0.0, "fr": 0.5, "rl": 0.5, "rr": 0.0}
+# Walk phase offsets: 4-beat lateral sequence RL→FL→RR→FR
+WALK_PHASE = {"rl": 0.0, "fl": 0.25, "rr": 0.50, "fr": 0.75}
+
+FRONT_LEGS = ("fl", "fr")
+REAR_LEGS  = ("rl", "rr")
+
+# Reciprocal apparatus (rear legs)
+RECIP_RATIO  = 0.85
+RECIP_OFFSET = -0.47 + RECIP_RATIO * 1.10  # ≈ 0.465
+
+
+def _cannon_angle(leg: str, thigh: float, knee: float) -> float:
+    """Front = passive linkage, Rear = reciprocal apparatus."""
+    if leg in REAR_LEGS:
+        return RECIP_OFFSET - RECIP_RATIO * knee
+    return CANNON_LEAN - (thigh + knee)
 
 
 # ── Foot trajectory helpers ─────────────────────────────────────────
 
 def foot_target(leg: str, phase: float, step_length: float, step_height: float,
-                body_height: float = ANKLE_HEIGHT):
+                body_height: float = ANKLE_HEIGHT, phase_offsets=None):
     """Return (foot_x, foot_z) targeting the ankle for a given leg at a gait phase."""
-    local = (phase - PHASE_OFFSET[leg]) % 1.0
+    offsets = phase_offsets or WALK_PHASE
+    local = (phase - offsets[leg]) % 1.0
     if local < SWING_FRAC:
         p = local / SWING_FRAC
         x = -step_length / 2 + step_length * p
@@ -124,26 +141,29 @@ def build_idle(n_frames: int = N_FRAMES):
         row = []
         for leg in ("fl", "fr", "rl", "rr"):
             th, tk = ik_safe(0.0, -(ANKLE_HEIGHT + bob))
-            cannon = CANNON_LEAN - (th + tk)
-            row += [0.0, th, tk, cannon]  # hip_yaw=0
+            cannon = _cannon_angle(leg, th, tk)
+            row += [0.0, th, tk, cannon]
         frames.append(row)
     return frames
 
 
 def build_parametric(speed: float, angular_rate: float,
-                      step_height: float = 0.06,
-                      n_frames: int = N_FRAMES):
-    """General trot gait with differential step lengths."""
+                      step_height_front: float = 0.06,
+                      step_height_rear: float = 0.05,
+                      n_frames: int = N_FRAMES,
+                      phase_offsets=None):
+    """General gait with differential step lengths and front/rear step heights."""
     sl = leg_step_lengths(speed, angular_rate)
     frames = []
     for i in range(n_frames):
         phase = i / n_frames
         row = []
         for leg in ("fl", "fr", "rl", "rr"):
-            fx, fz = foot_target(leg, phase, sl[leg], step_height)
+            sh = step_height_rear if leg in REAR_LEGS else step_height_front
+            fx, fz = foot_target(leg, phase, sl[leg], sh, phase_offsets=phase_offsets)
             th, tk = ik_safe(fx, fz)
-            cannon = CANNON_LEAN - (th + tk)
-            row += [0.0, th, tk, cannon]  # hip_yaw=0
+            cannon = _cannon_angle(leg, th, tk)
+            row += [0.0, th, tk, cannon]
         frames.append(row)
     return frames
 
@@ -168,8 +188,8 @@ def build_turn(angular_rate: float, n_frames: int = N_FRAMES):
                 leg_phase = phase if side == "right" else (phase + 0.5) % 1.0
             fx, fz = foot_target(leg, leg_phase, stride_inner, 0.05)
             th, tk = ik_safe(fx, fz)
-            cannon = CANNON_LEAN - (th + tk)
-            row += [0.0, th, tk, cannon]  # hip_yaw=0
+            cannon = _cannon_angle(leg, th, tk)
+            row += [0.0, th, tk, cannon]
         frames.append(row)
     return frames
 
@@ -205,14 +225,21 @@ def main():
     save_animation("idle",       "Standing still with gentle weight-shift bob",
                    build_idle(),              speed=0.0, angular_rate=0.0)
 
-    save_animation("walk_forward", "Trot gait straight ahead at full speed",
-                   build_parametric(1.0, 0.0), speed=1.0, angular_rate=0.0)
+    save_animation("walk_forward", "Bovine walk — 4-beat lateral sequence",
+                   build_parametric(1.0, 0.0, phase_offsets=WALK_PHASE),
+                   speed=0.5, angular_rate=0.0, duration=1.1)
 
-    save_animation("walk_left",  "Arc-left trot — left legs shorter stride",
-                   build_parametric(1.0, -1.0), speed=1.0, angular_rate=-1.0)
+    save_animation("trot_forward", "Bovine trot — diagonal pair gait",
+                   build_parametric(1.0, 0.0, phase_offsets=TROT_PHASE),
+                   speed=1.0, angular_rate=0.0, duration=0.7)
 
-    save_animation("walk_right", "Arc-right trot — right legs shorter stride",
-                   build_parametric(1.0,  1.0), speed=1.0, angular_rate=1.0)
+    save_animation("walk_left",  "Arc-left walk — left legs shorter stride",
+                   build_parametric(1.0, -1.0, phase_offsets=WALK_PHASE),
+                   speed=0.5, angular_rate=-1.0, duration=1.1)
+
+    save_animation("walk_right", "Arc-right walk — right legs shorter stride",
+                   build_parametric(1.0,  1.0, phase_offsets=WALK_PHASE),
+                   speed=0.5, angular_rate=1.0, duration=1.1)
 
     save_animation("turn_left",  "Spin in place to the left",
                    build_turn(-1.0),           speed=0.0, angular_rate=-1.0)
@@ -221,7 +248,7 @@ def main():
                    build_turn(1.0),            speed=0.0, angular_rate=1.0)
 
     print()
-    print("Done.  6 animations generated.")
+    print("Done.  7 animations generated.")
 
 
 if __name__ == "__main__":
