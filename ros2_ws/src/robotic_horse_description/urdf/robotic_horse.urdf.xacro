@@ -600,24 +600,22 @@
 
   <!-- ═══════════════════════════════════════════════════════
        CARRIAGE — vis-à-vis style, hitched to bovine robot
-       Correct kinematic chain (real carriage):
-         base_link → shaft_yaw (continuous, z)
-           → shaft_yaw_link (dummy)
-             → shaft_roll (revolute, x, ±0.20 rad)
-               → shaft_link (U-fork, 2.35m, bars at ±0.50m to clear body)
-                 → shaft_pitch (revolute, y, at perch)
-                   → front_assembly_link (perch + front axle + turntable)
-                     ├─ cart_fl_wheel_joint (continuous)
-                     ├─ cart_fr_wheel_joint (continuous)
-                     └─ turntable_yaw_joint (revolute, z, ±45°)
-                        → cart_body_link (body, driver, etc.)
-                          → rear_axle_joint (fixed)
-                            → rear_axle_link
-                              ├─ cart_rl_wheel_joint (continuous)
-                              └─ cart_rr_wheel_joint (continuous)
-       Ball-joint at cow: yaw (z) + roll (x) = 2 DOF
-       Pitch at carriage end: 1 DOF
-       Total: 3 rotational DOF ≈ ball joint
+       Kinematic chain:
+         base_link → cow_hitch_pitch (revolute, y, ±0.35 rad)
+           → shaft_link (U-fork, 2.35m, bars at ±0.50m to clear body)
+             → perch_pitch (revolute, y, at perch)
+               → front_assembly_link (perch + front axle + turntable)
+                 ├─ cart_fl_wheel_joint (continuous)
+                 ├─ cart_fr_wheel_joint (continuous)
+                 └─ turntable_yaw_joint (revolute, z, ±45°)
+                    → cart_body_link (body, driver, etc.)
+                      → rear_axle_joint (fixed)
+                        → rear_axle_link
+                          ├─ cart_rl_wheel_joint (continuous)
+                          └─ cart_rr_wheel_joint (continuous)
+       Cow-side hitch: pitch only (Y-axis) — shaft pivots up/down
+       Perch-side hitch: pitch (Y-axis) — same as real carriage hitch
+       Total: 2 pitch DOF + turntable yaw = 3 DOF
        Shaft bars at ±0.50m (1.0m apart) clear 0.88m body width
        Real measurements from owner's carriage:
          Front wheels ⌀ 85 cm,  Rear wheels ⌀ 105 cm
@@ -629,28 +627,15 @@
        Total carriage mass ≈ 105 kg + 85 kg driver = 190 kg
   ═══════════════════════════════════════════════════════ -->
 
-  <!-- Shaft yaw joint — free yaw rotation (harness strap compliance)
-       Very low damping: cow can sway without jostling carriage -->
-  <joint name="shaft_yaw_joint" type="continuous">
-    <parent link="base_link"/><child link="shaft_yaw_link"/>
+  <!-- Cow-side hitch — pitch only (up/down in forward direction)
+       Like a real carriage hitch pivot: shaft can tilt up/down but
+       does not yaw or roll relative to the cow body. -->
+  <joint name="cow_hitch_pitch_joint" type="revolute">
+    <parent link="base_link"/><child link="shaft_link"/>
     <origin xyz="0.0 0 -0.30" rpy="0 0 0"/>
-    <axis xyz="0 0 1"/>
-    <dynamics damping="0.2" friction="0.05"/>
-  </joint>
-  <!-- Dummy link between yaw and roll joints -->
-  <link name="shaft_yaw_link">
-    <inertial><mass value="0.5"/><origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
-  </link>
-
-  <!-- Shaft roll joint — allows body roll without transferring to carriage
-       Simulates leather harness flexibility around the barrel -->
-  <joint name="shaft_roll_joint" type="revolute">
-    <parent link="shaft_yaw_link"/><child link="shaft_link"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-0.25" upper="0.25" effort="0" velocity="2.0"/>
-    <dynamics damping="0.3" friction="0.05"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.35" upper="0.35" effort="0" velocity="2.0"/>
+    <dynamics damping="1.0" friction="0.1"/>
   </joint>
 
   <!-- Shaft — U-shaped wooden fork, 2.35m long
@@ -675,9 +660,9 @@
       <geometry><box size="0.05 0.85 0.05"/></geometry></collision>
   </link>
 
-  <!-- Shaft pitch joint — perch pivot at front of front axle assembly
+  <!-- Perch pitch joint — pivot at front of front axle assembly
        Moderate damping: allows free pitch motion over bumps without oscillation. -->
-  <joint name="shaft_pitch_joint" type="revolute">
+  <joint name="perch_pitch_joint" type="revolute">
     <parent link="shaft_link"/><child link="front_assembly_link"/>
     <origin xyz="-2.35 0 0.015" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
@@ -900,7 +885,6 @@
   </link>
 
   <!-- ── Gazebo contact/material for carriage ── -->
-  <gazebo reference="shaft_yaw_link"/>
   <gazebo reference="shaft_link"><material>Gazebo/Wood</material></gazebo>
   <gazebo reference="front_assembly_link"><material>Gazebo/Grey</material></gazebo>
   <gazebo reference="cart_body_link"><material>Gazebo/Wood</material></gazebo>
