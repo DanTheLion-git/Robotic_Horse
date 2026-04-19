@@ -3,9 +3,9 @@ project(robotic_horse_description)
 
 find_package(ament_cmake REQUIRED)
 
-# Install everything so launch/urdf/rviz are accessible at runtime
+# Install URDF files so they are accessible at runtime
 install(
-  DIRECTORY urdf launch rviz
+  DIRECTORY urdf
   DESTINATION share/${PROJECT_NAME}
 )
 
